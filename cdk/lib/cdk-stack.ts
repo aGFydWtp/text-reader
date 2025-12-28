@@ -134,6 +134,14 @@ export class TextReaderStack extends cdk.Stack {
       },
     });
 
+    // 将来的に FunctionUrlOrigin.withOriginAccessControl(functionUrl); で自動で付与される可能性もある。（lambda:InvokeFunctionUrl は自動で付与されているため）
+    frontendFunction.addPermission("AllowCloudFrontInvokeFunction", {
+      principal: new iam.ServicePrincipal("cloudfront.amazonaws.com"),
+      invokedViaFunctionUrl: true,
+      action: "lambda:InvokeFunction",
+      sourceArn: distribution.distributionArn,
+    });
+
     new cdk.CfnOutput(this, 'FilesBucketName', { value: filesBucket.bucketName });
     new cdk.CfnOutput(this, 'JobsTableName', { value: jobsTable.tableName });
     new cdk.CfnOutput(this, 'TtsCompleteTopicArn', { value: ttsCompleteTopic.topicArn });
