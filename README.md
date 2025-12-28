@@ -28,3 +28,13 @@ Deploy both in one command:
 ```sh
 FRONTEND_IMAGE_TAG=latest pnpm -C cdk deploy:all
 ```
+
+## Push frontend image to ECR
+
+The script resolves the ECR URI from the `TextReaderEcrStack` outputs.
+
+```sh
+AWS_REGION=ap-northeast-1 ./scripts/push-frontend-image.sh
+AWS_REGION=ap-northeast-1 ./scripts/push-frontend-image.sh 2024-09-01
+AWS_REGION=ap-northeast-1 STACK_NAME=TextReaderEcrStack ./scripts/push-frontend-image.sh 2024-09-01 linux/arm64
+```
