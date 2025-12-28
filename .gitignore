@@ -1,0 +1,30 @@
+# Node
+node_modules/
+.pnp.cjs
+.pnp.loader.mjs
+.pnpm-store/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Builds
+build/
+dist/
+out/
+
+# Environment
+.env
+.env.*
+
+# CDK
+cdk/cdk.out/
+cdk.out/
+
+# OS
+.DS_Store
