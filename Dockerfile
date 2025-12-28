@@ -13,7 +13,7 @@ COPY --from=deps /app/node_modules /app/node_modules
 COPY package.json pnpm-lock.yaml ./
 COPY . .
 RUN pnpm build
-RUN pnpm prune --prod
+RUN CI=true pnpm prune --prod
 
 FROM public.ecr.aws/docker/library/node:24-slim AS runtime
 WORKDIR /app
