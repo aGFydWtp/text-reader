@@ -48,6 +48,7 @@ export class TextReaderStack extends cdk.Stack {
 
     const ttsStartFunction = new nodejs.NodejsFunction(this, 'TtsStartFunction', {
       runtime: lambda.Runtime.NODEJS_24_X,
+      timeout: cdk.Duration.seconds(120),
       entry: path.join(__dirname, '..', 'lambdas', 'tts-start.ts'),
       handler: 'handler',
       environment: {
@@ -79,6 +80,7 @@ export class TextReaderStack extends cdk.Stack {
 
     const ttsCompleteFunction = new nodejs.NodejsFunction(this, 'TtsCompleteFunction', {
       runtime: lambda.Runtime.NODEJS_24_X,
+      timeout: cdk.Duration.seconds(30),
       entry: path.join(__dirname, '..', 'lambdas', 'tts-complete.ts'),
       handler: 'handler',
       environment: {
@@ -101,6 +103,7 @@ export class TextReaderStack extends cdk.Stack {
         tagOrDigest: props.frontendImageTag,
       }),
       architecture: lambda.Architecture.ARM_64,
+      timeout: cdk.Duration.seconds(60),
       environment: {
         FILES_BUCKET_NAME: filesBucket.bucketName,
         JOBS_TABLE_NAME: jobsTable.tableName,
