@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
@@ -12,8 +13,13 @@ import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as path from 'path';
 
+export interface TextReaderStackProps extends cdk.StackProps {
+  frontendRepository: ecr.IRepository;
+  frontendImageTag: string;
+}
+
 export class TextReaderStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: TextReaderStackProps) {
     super(scope, id, props);
 
     const filesBucket = new s3.Bucket(this, 'FilesBucket', {
@@ -90,10 +96,10 @@ export class TextReaderStack extends cdk.Stack {
       }),
     );
 
-    const frontendFunction = new nodejs.NodejsFunction(this, 'FrontendFunction', {
-      runtime: lambda.Runtime.NODEJS_24_X,
-      entry: path.join(__dirname, '..', 'lambdas', 'frontend-ssr.ts'),
-      handler: 'handler',
+    const frontendFunction = new lambda.DockerImageFunction(this, 'FrontendFunction', {
+      code: lambda.DockerImageCode.fromEcr(props.frontendRepository, {
+        tagOrDigest: props.frontendImageTag,
+      }),
       environment: {
         FILES_BUCKET_NAME: filesBucket.bucketName,
         JOBS_TABLE_NAME: jobsTable.tableName,

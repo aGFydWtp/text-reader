@@ -1,2 +1,6 @@
+packages:
+  - .
+  - cdk
+
 onlyBuiltDependencies:
   - esbuild

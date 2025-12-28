@@ -4,8 +4,11 @@ import { TextReaderStack } from '../lib/cdk-stack';
 import { EcrStack } from '../lib/ecr-stack';
 
 const app = new cdk.App();
+const frontendImageTag = app.node.tryGetContext('frontendImageTag') ?? 'latest';
 const ecrStack = new EcrStack(app, 'TextReaderEcrStack');
-new TextReaderStack(app, 'TextReaderStack', {
+const appStack = new TextReaderStack(app, 'TextReaderStack', {
+  frontendRepository: ecrStack.frontendRepository,
+  frontendImageTag,
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */
@@ -22,3 +25,4 @@ new TextReaderStack(app, 'TextReaderStack', {
 });
 
 cdk.Tags.of(ecrStack).add('Component', 'ecr');
+appStack.addDependency(ecrStack);
