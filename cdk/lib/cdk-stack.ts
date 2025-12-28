@@ -100,6 +100,7 @@ export class TextReaderStack extends cdk.Stack {
       code: lambda.DockerImageCode.fromEcr(props.frontendRepository, {
         tagOrDigest: props.frontendImageTag,
       }),
+      architecture: lambda.Architecture.ARM_64,
       environment: {
         FILES_BUCKET_NAME: filesBucket.bucketName,
         JOBS_TABLE_NAME: jobsTable.tableName,
