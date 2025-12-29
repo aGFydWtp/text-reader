@@ -132,26 +132,79 @@ export const handler = async (event: S3Event): Promise<void> => {
     const ssmlBody = applyDictionary(text, fileDict);
     const ssml = `<speak>${ssmlBody}</speak>`;
 
+    // Polly has length limits; if we exceed, mark the job as FAILED and stop (avoid repeated retries).
+    // We use total length as a conservative proxy (SSML tags still count toward total length).
+    const totalChars = ssml.length;
+    const MAX_TOTAL_CHARS = 200_000; // Polly StartSpeechSynthesisTask total input limit
+    if (totalChars > MAX_TOTAL_CHARS) {
+      const message = `Input too long for Polly: ${totalChars} chars (max ${MAX_TOTAL_CHARS}). Please split the text.`;
+      console.warn(message);
+      await dynamo.send(
+        new UpdateCommand({
+          TableName: JOBS_TABLE_NAME,
+          Key: { pk: job.pk, sk: job.sk },
+          UpdateExpression: 'SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt',
+          ExpressionAttributeNames: { '#status': 'status' },
+          ExpressionAttributeValues: {
+            ':status': 'FAILED',
+            ':errorMessage': message,
+            ':updatedAt': Date.now(),
+          },
+          ConditionExpression: 'attribute_exists(pk)',
+        }),
+      );
+      continue;
+    }
+
     const epochMillis = Date.now();
-    const outputKey = `${normalizePrefix(OUTPUT_PREFIX)}${jobId}/output-${epochMillis}.mp3`;
+    // Polly appends a TaskId to the object name; OutputS3KeyPrefix is a *prefix*, not a full filename.
+    // e.g. files/audio/<jobId>/output-<epochMillis>-<TaskId>.mp3
+    const outputKeyPrefix = `${normalizePrefix(OUTPUT_PREFIX)}${jobId}/output-${epochMillis}-`;
 
     const voiceId = POLLY_VOICE_ID as VoiceId;
-    const startTask = await polly.send(
-      new StartSpeechSynthesisTaskCommand({
-        OutputFormat: 'mp3',
-        OutputS3BucketName: FILES_BUCKET_NAME,
-        OutputS3KeyPrefix: outputKey,
-        Text: ssml,
-        TextType: 'ssml',
-        VoiceId: voiceId,
-        Engine: POLLY_ENGINE === 'neural' ? 'neural' : 'standard',
-        SnsTopicArn: SNS_TOPIC_ARN,
-      }),
-    );
 
-    const taskId = startTask.SynthesisTask?.TaskId;
-    if (!taskId) {
-      throw new Error(`Polly did not return TaskId for jobId=${jobId}`);
+    let taskId: string | undefined;
+    try {
+      const startTask = await polly.send(
+        new StartSpeechSynthesisTaskCommand({
+          OutputFormat: 'mp3',
+          OutputS3BucketName: FILES_BUCKET_NAME,
+          OutputS3KeyPrefix: outputKeyPrefix,
+          Text: ssml,
+          TextType: 'ssml',
+          VoiceId: voiceId,
+          Engine: POLLY_ENGINE === 'neural' ? 'neural' : 'standard',
+          SnsTopicArn: SNS_TOPIC_ARN,
+        }),
+      );
+
+      taskId = startTask.SynthesisTask?.TaskId;
+      if (!taskId) {
+        throw new Error(`Polly did not return TaskId for jobId=${jobId}`);
+      }
+    } catch (err) {
+      const e = err as { name?: string; message?: string };
+      const name = e?.name ?? 'UnknownError';
+      const message = e?.message ?? String(err);
+      console.error('Polly StartSpeechSynthesisTask failed', { jobId, name, message });
+
+      await dynamo.send(
+        new UpdateCommand({
+          TableName: JOBS_TABLE_NAME,
+          Key: { pk: job.pk, sk: job.sk },
+          UpdateExpression: 'SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt',
+          ExpressionAttributeNames: { '#status': 'status' },
+          ExpressionAttributeValues: {
+            ':status': 'FAILED',
+            ':errorMessage': `${name}: ${message}`,
+            ':updatedAt': Date.now(),
+          },
+          ConditionExpression: 'attribute_exists(pk)',
+        }),
+      );
+
+      // Do not throw; avoid S3 event retry storms.
+      continue;
     }
 
     await dynamo.send(
@@ -159,12 +212,13 @@ export const handler = async (event: S3Event): Promise<void> => {
         TableName: JOBS_TABLE_NAME,
         Key: { pk: job.pk, sk: job.sk },
         UpdateExpression:
-          'SET #status = :status, pollyTaskId = :pollyTaskId, outputEpochMillis = :outputEpochMillis, updatedAt = :updatedAt',
+          'SET #status = :status, pollyTaskId = :pollyTaskId, outputEpochMillis = :outputEpochMillis, outputKeyPrefix = :outputKeyPrefix, updatedAt = :updatedAt',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: {
           ':status': 'TTS_STARTED',
           ':pollyTaskId': taskId,
           ':outputEpochMillis': epochMillis,
+          ':outputKeyPrefix': outputKeyPrefix,
           ':updatedAt': epochMillis,
         },
         ConditionExpression: 'attribute_exists(pk)',
