@@ -165,6 +165,8 @@ export class TextReaderStack extends cdk.Stack {
         JOBS_TABLE_NAME: jobsTable.tableName,
       },
     });
+    // SSR reads jobs list/status from DynamoDB
+    jobsTable.grantReadData(frontendFunction);
 
     const frontendFunctionUrl = frontendFunction.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.AWS_IAM,
@@ -186,6 +188,7 @@ export class TextReaderStack extends cdk.Stack {
         origin: frontendOrigin,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       },
       additionalBehaviors: {
@@ -202,6 +205,14 @@ export class TextReaderStack extends cdk.Stack {
             certificate,
           }
         : {}),
+    });
+
+    // 将来的に FunctionUrlOrigin.withOriginAccessControl(functionUrl); で自動で付与される可能性もある。（lambda:InvokeFunctionUrl は自動で付与されているため）
+    frontendFunction.addPermission("AllowCloudFrontInvokeFunction", {
+      principal: new iam.ServicePrincipal("cloudfront.amazonaws.com"),
+      invokedViaFunctionUrl: true,
+      action: "lambda:InvokeFunction",
+      sourceArn: distribution.distributionArn,
     });
 
     let cloudFrontAliasRecord: route53.ARecord | undefined;
@@ -292,14 +303,19 @@ export class TextReaderStack extends cdk.Stack {
     });
 
     const localBaseUrl = 'http://localhost:5173';
-    const callbackUrls = [
-      `https://${distribution.distributionDomainName}/auth/callback`,
-      `${localBaseUrl}/auth/callback`,
-    ];
-    const logoutUrls = [
-      `https://${distribution.distributionDomainName}/logout`,
-      `${localBaseUrl}/logout`,
-    ];
+
+    // Avoid circular dependency (Cognito client <-> CloudFront distribution) by not referencing
+    // `distribution.distributionDomainName` in callback/logout URLs.
+    const publicAppOriginForCognito = props.customDomain
+      ? `https://${props.customDomain.domainName}`
+      : new cdk.CfnParameter(this, 'PublicAppOriginForCognito', {
+          type: 'String',
+          description:
+            'Public origin of the app used in Cognito callback/logout URLs (e.g. https://example.cloudfront.net).',
+        }).valueAsString;
+
+    const callbackUrls = [`${publicAppOriginForCognito}/auth/callback`, `${localBaseUrl}/auth/callback`];
+    const logoutUrls = [`${publicAppOriginForCognito}/logout`, `${localBaseUrl}/logout`];
 
     const userPoolClient = userPool.addClient('UserPoolClient', {
       authFlows: {
@@ -321,6 +337,21 @@ export class TextReaderStack extends cdk.Stack {
     });
     userPoolClient.node.addDependency(googleProvider);
 
+    const publicAppOrigin = props.customDomain
+      ? `https://${props.customDomain.domainName}`
+      : publicAppOriginForCognito;
+
+    const cognitoBaseUrl = props.cognitoCustomDomain
+      ? `https://${props.cognitoCustomDomain.domainName}`
+      : cdk.Fn.sub('https://${Prefix}.auth.${AWS::Region}.amazoncognito.com', {
+          Prefix: cognitoDomainPrefix!.valueAsString,
+        });
+
+    frontendFunction.addEnvironment('COGNITO_DOMAIN', cognitoBaseUrl);
+    frontendFunction.addEnvironment('COGNITO_CLIENT_ID', userPoolClient.userPoolClientId);
+    frontendFunction.addEnvironment('COGNITO_ISSUER', userPool.userPoolProviderUrl);
+    frontendFunction.addEnvironment('PUBLIC_APP_ORIGIN', publicAppOrigin);
+
     const userPoolCfn = userPool.node.defaultChild as cognito.CfnUserPool;
     userPoolCfn.webAuthnRelyingPartyId = props.cognitoCustomDomain
       ? props.cognitoCustomDomain.domainName
@@ -336,14 +367,6 @@ export class TextReaderStack extends cdk.Stack {
         targetDomainName: userPoolDomain.cloudFrontEndpoint,
       });
     }
-
-    // 将来的に FunctionUrlOrigin.withOriginAccessControl(functionUrl); で自動で付与される可能性もある。（lambda:InvokeFunctionUrl は自動で付与されているため）
-    frontendFunction.addPermission("AllowCloudFrontInvokeFunction", {
-      principal: new iam.ServicePrincipal("cloudfront.amazonaws.com"),
-      invokedViaFunctionUrl: true,
-      action: "lambda:InvokeFunction",
-      sourceArn: distribution.distributionArn,
-    });
 
     new cdk.CfnOutput(this, 'FilesBucketName', { value: filesBucket.bucketName });
     new cdk.CfnOutput(this, 'JobsTableName', { value: jobsTable.tableName });

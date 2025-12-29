@@ -6,7 +6,10 @@
 </script>
 
 <section class="page">
-  <h1>My Files</h1>
+  <div class="page-header">
+    <h1>My Files</h1>
+    <a class="new-link" href="/files/new">ファイル登録</a>
+  </div>
 
   {#if data.error}
     <div class="error">{data.error}</div>
@@ -41,6 +44,19 @@
   h1 {
     font-size: 24px;
     font-weight: 600;
+  }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .new-link {
+    font-size: 14px;
+    text-decoration: none;
+    color: #5b4b32;
   }
 
   .error {
