@@ -165,10 +165,12 @@ export class TextReaderStack extends cdk.Stack {
         JOBS_TABLE_NAME: jobsTable.tableName,
       },
     });
-    // SSR reads jobs list/status from DynamoDB
-    jobsTable.grantReadData(frontendFunction);
+    // SSR reads/writes jobs (list, create, update dict)
+    jobsTable.grantReadWriteData(frontendFunction);
     // SSR issues presigned S3 GET URLs for generated audio
     filesBucket.grantRead(frontendFunction, 'files/audio/*');
+    // SSR issues presigned S3 PUT URLs for uploads
+    filesBucket.grantPut(frontendFunction, 'files/uploaded/*');
 
     const frontendFunctionUrl = frontendFunction.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.AWS_IAM,
