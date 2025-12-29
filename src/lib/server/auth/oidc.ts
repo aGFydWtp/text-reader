@@ -1,5 +1,5 @@
-import { COGNITO_CLIENT_ID, COGNITO_DOMAIN, COGNITO_ISSUER } from '$env/static/private';
-import { PUBLIC_APP_ORIGIN } from '$env/static/public';
+import { env as privateEnv } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
 import { redirect } from '@sveltejs/kit';
 
 type TokenResponse = {
@@ -13,6 +13,9 @@ export function buildAuthorizeUrl(params: {
   state: string;
   codeChallenge: string;
 }): string {
+  const { COGNITO_CLIENT_ID, COGNITO_DOMAIN } = privateEnv;
+  const { PUBLIC_APP_ORIGIN } = publicEnv;
+
   const authorizeUrl = new URL('/oauth2/authorize', COGNITO_DOMAIN);
   authorizeUrl.searchParams.set('response_type', 'code');
   authorizeUrl.searchParams.set('client_id', COGNITO_CLIENT_ID);
@@ -29,6 +32,9 @@ export async function exchangeCodeForTokens(payload: {
   code: string;
   codeVerifier: string;
 }): Promise<TokenResponse> {
+  const { COGNITO_CLIENT_ID, COGNITO_DOMAIN } = privateEnv;
+  const { PUBLIC_APP_ORIGIN } = publicEnv;
+
   const tokenUrl = new URL('/oauth2/token', COGNITO_DOMAIN);
   const body = new URLSearchParams();
   body.set('grant_type', 'authorization_code');
@@ -67,6 +73,7 @@ function base64UrlDecode(input: string): string {
 }
 
 export function parseIdToken(idToken: string): JwtPayload | null {
+  const { COGNITO_ISSUER } = privateEnv;
   const parts = idToken.split('.');
   if (parts.length !== 3) return null;
 
@@ -81,6 +88,9 @@ export function parseIdToken(idToken: string): JwtPayload | null {
 }
 
 export function buildLogoutUrl(): string {
+  const { COGNITO_CLIENT_ID, COGNITO_DOMAIN } = privateEnv;
+  const { PUBLIC_APP_ORIGIN } = publicEnv;
+
   const logoutUrl = new URL('/logout', COGNITO_DOMAIN);
   logoutUrl.searchParams.set('client_id', COGNITO_CLIENT_ID);
   logoutUrl.searchParams.set('logout_uri', `${PUBLIC_APP_ORIGIN}/`);

@@ -1,4 +1,4 @@
-import { AWS_REGION, JOBS_TABLE_NAME } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 
@@ -12,7 +12,7 @@ export type JobItem = {
   latestAudioKey?: string;
 };
 
-const client = new DynamoDBClient({ region: AWS_REGION });
+const client = new DynamoDBClient({ region: env.AWS_REGION });
 const docClient = DynamoDBDocumentClient.from(client);
 
 export async function listJobsForUser(userSub: string): Promise<{
@@ -20,10 +20,14 @@ export async function listJobsForUser(userSub: string): Promise<{
   error?: string;
 }> {
   try {
+    if (!env.JOBS_TABLE_NAME) {
+      return { items: [], error: 'JOBS_TABLE_NAME is not set' };
+    }
+
     const pk = `USER#${userSub}`;
     const response = await docClient.send(
       new QueryCommand({
-        TableName: JOBS_TABLE_NAME,
+        TableName: env.JOBS_TABLE_NAME,
         KeyConditionExpression: 'pk = :pk and begins_with(sk, :skPrefix)',
         ExpressionAttributeValues: {
           ':pk': pk,
