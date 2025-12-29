@@ -8,8 +8,14 @@ export const load: PageServerLoad = async ({ locals }) => {
   }
 
   const { items, error } = await listJobsForUser(user.sub);
+  const jobs = items.map((item) => {
+    const jobId =
+      item.id ?? (typeof item.sk === 'string' && item.sk.startsWith('JOB#') ? item.sk.slice(4) : item.sk);
+    return { ...item, jobId };
+  });
+
   return {
-    jobs: items,
+    jobs,
     error: error ?? null,
   };
 };

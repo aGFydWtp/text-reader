@@ -18,18 +18,18 @@
   {#if jobs.length === 0}
     <p class="empty">ファイルがありません。</p>
   {:else}
-    <div class="table">
-      <div class="row header">
-        <div>Filename</div>
-        <div>Status</div>
-        <div>Updated</div>
-      </div>
+    <div class="card-list">
       {#each jobs as job}
-        <div class="row">
-          <div class="filename">{job.filename ?? job.sk}</div>
-          <div class="status">{job.status ?? '-'}</div>
-          <div class="updated">{job.updatedAt ?? '-'}</div>
-        </div>
+        <a class="card" href={`/jobs/${job.jobId}`}>
+          <div class="card-head">
+            <div class="title">{job.filename ?? job.sk}</div>
+            <span class={`pill ${job.status ?? 'neutral'}`}>{job.status ?? 'UNKNOWN'}</span>
+          </div>
+          <div class="meta">
+            <span class="label">Updated</span>
+            <span>{job.updatedAt ?? '-'}</span>
+          </div>
+        </a>
       {/each}
     </div>
   {/if}
@@ -71,42 +71,69 @@
     color: #6b645c;
   }
 
-  .table {
+  .card-list {
     display: grid;
-    border: 1px solid #e5e0d9;
-    border-radius: 12px;
-    overflow: hidden;
-    background: #ffffff;
-  }
-
-  .row {
-    display: grid;
-    grid-template-columns: minmax(180px, 1.4fr) 120px 160px;
     gap: 12px;
-    padding: 12px 16px;
-    align-items: center;
-    border-top: 1px solid #f0ebe5;
-    font-size: 14px;
   }
 
-  .row.header {
+  .card {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid #e5e0d9;
+    background: #fffdf8;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .title {
+    font-size: 16px;
     font-weight: 600;
-    background: #faf7f2;
-    border-top: none;
-  }
-
-  .filename {
     word-break: break-word;
   }
 
-  @media (max-width: 640px) {
-    .row {
-      grid-template-columns: 1fr;
-      gap: 4px;
-    }
+  .meta {
+    display: flex;
+    gap: 8px;
+    font-size: 12px;
+    color: #6b645c;
+  }
 
-    .row.header {
-      display: none;
-    }
+  .label {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+  }
+
+  .pill {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f3eee7;
+    color: #5b4b32;
+    text-transform: uppercase;
+  }
+
+  .pill.COMPLETED {
+    background: #e4f1e6;
+    color: #1d5a34;
+  }
+
+  .pill.TTS_STARTED {
+    background: #fff4dc;
+    color: #8a5a12;
+  }
+
+  .pill.FAILED {
+    background: #ffe6e0;
+    color: #9c2c12;
   }
 </style>
