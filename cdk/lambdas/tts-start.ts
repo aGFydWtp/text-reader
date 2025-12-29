@@ -65,9 +65,170 @@ const applyDictionary = (text: string, dict: Record<string, string>): string => 
 
 const normalizePrefix = (prefix: string): string => (prefix.endsWith('/') ? prefix : `${prefix}/`);
 
-export const handler = async (event: S3Event): Promise<void> => {
+type JobRecord = {
+  pk: string;
+  sk: string;
+  id: string;
+  uploadKey?: string;
+  fileDict?: Record<string, string>;
+};
+
+const loadJobById = async (jobId: string): Promise<JobRecord | null> => {
+  const jobResult = await dynamo.send(
+    new QueryCommand({
+      TableName: JOBS_TABLE_NAME,
+      IndexName: 'GSI_JobId',
+      KeyConditionExpression: 'id = :id',
+      ExpressionAttributeValues: {
+        ':id': jobId,
+      },
+      Limit: 2,
+    }),
+  );
+
+  if (!jobResult.Items || jobResult.Items.length === 0) {
+    return null;
+  }
+
+  if (jobResult.Items.length > 1) {
+    console.warn(`Multiple jobs found for id=${jobId}, using first.`);
+  }
+
+  return jobResult.Items[0] as JobRecord;
+};
+
+const loadTextFromS3 = async (bucketName: string, objectKey: string): Promise<string> => {
+  const getObject = await s3.send(
+    new GetObjectCommand({
+      Bucket: bucketName,
+      Key: objectKey,
+    }),
+  );
+
+  if (!getObject.Body) {
+    throw new Error(`Empty S3 object body: ${objectKey}`);
+  }
+
+  return streamToString(getObject.Body as Readable);
+};
+
+const markFailed = async (job: JobRecord, message: string) => {
+  await dynamo.send(
+    new UpdateCommand({
+      TableName: JOBS_TABLE_NAME,
+      Key: { pk: job.pk, sk: job.sk },
+      UpdateExpression: 'SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: {
+        ':status': 'FAILED',
+        ':errorMessage': message,
+        ':updatedAt': Date.now(),
+      },
+      ConditionExpression: 'attribute_exists(pk)',
+    }),
+  );
+};
+
+const processJob = async (payload: { jobId: string; objectKey?: string; bucketName?: string }) => {
+  const job = await loadJobById(payload.jobId);
+  if (!job) {
+    console.warn(`Job not found for id=${payload.jobId}. Skipping.`);
+    return;
+  }
+
+  const objectKey = payload.objectKey ?? job.uploadKey;
+  if (!objectKey) {
+    await markFailed(job, 'uploadKey is missing for this job');
+    return;
+  }
+
+  const bucketName = payload.bucketName ?? (FILES_BUCKET_NAME as string);
+  const text = await loadTextFromS3(bucketName, objectKey);
+  const fileDict = (job.fileDict ?? {}) as Record<string, string>;
+  const ssmlBody = applyDictionary(text, fileDict);
+  const ssml = `<speak>${ssmlBody}</speak>`;
+
+  // Polly has length limits; if we exceed, mark the job as FAILED and stop (avoid repeated retries).
+  // We use total length as a conservative proxy (SSML tags still count toward total length).
+  const totalChars = ssml.length;
+  const MAX_TOTAL_CHARS = 200_000; // Polly StartSpeechSynthesisTask total input limit
+  if (totalChars > MAX_TOTAL_CHARS) {
+    const message = `Input too long for Polly: ${totalChars} chars (max ${MAX_TOTAL_CHARS}). Please split the text.`;
+    console.warn(message);
+    await markFailed(job, message);
+    return;
+  }
+
+  const epochMillis = Date.now();
+  // Polly appends a TaskId to the object name; OutputS3KeyPrefix is a *prefix*, not a full filename.
+  // e.g. files/audio/<jobId>/output-<epochMillis>.<TaskId>.mp3
+  const outputKeyPrefix = `${normalizePrefix(OUTPUT_PREFIX)}${payload.jobId}/output-${epochMillis}`;
+
+  const voiceId = POLLY_VOICE_ID as VoiceId;
+
+  let taskId: string | undefined;
+  try {
+    const startTask = await polly.send(
+      new StartSpeechSynthesisTaskCommand({
+        OutputFormat: 'mp3',
+        OutputS3BucketName: FILES_BUCKET_NAME,
+        OutputS3KeyPrefix: outputKeyPrefix,
+        Text: ssml,
+        TextType: 'ssml',
+        VoiceId: voiceId,
+        Engine: POLLY_ENGINE === 'neural' ? 'neural' : 'standard',
+        SnsTopicArn: SNS_TOPIC_ARN,
+      }),
+    );
+
+    taskId = startTask.SynthesisTask?.TaskId;
+    if (!taskId) {
+      throw new Error(`Polly did not return TaskId for jobId=${payload.jobId}`);
+    }
+  } catch (err) {
+    const e = err as { name?: string; message?: string };
+    const name = e?.name ?? 'UnknownError';
+    const message = e?.message ?? String(err);
+    console.error('Polly StartSpeechSynthesisTask failed', { jobId: payload.jobId, name, message });
+
+    await markFailed(job, `${name}: ${message}`);
+    return;
+  }
+
+  await dynamo.send(
+    new UpdateCommand({
+      TableName: JOBS_TABLE_NAME,
+      Key: { pk: job.pk, sk: job.sk },
+      UpdateExpression:
+        'SET #status = :status, pollyTaskId = :pollyTaskId, outputEpochMillis = :outputEpochMillis, outputKeyPrefix = :outputKeyPrefix, updatedAt = :updatedAt',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: {
+        ':status': 'TTS_STARTED',
+        ':pollyTaskId': taskId,
+        ':outputEpochMillis': epochMillis,
+        ':outputKeyPrefix': outputKeyPrefix,
+        ':updatedAt': epochMillis,
+      },
+      ConditionExpression: 'attribute_exists(pk)',
+    }),
+  );
+};
+
+export const handler = async (
+  event: S3Event | { jobId?: string },
+): Promise<void> => {
   ensureRequiredEnv();
   console.log('TTS start event received', JSON.stringify(event, null, 2));
+
+  if (!('Records' in event)) {
+    const maybeJobId = (event as { jobId?: string }).jobId;
+    if (!maybeJobId) {
+      console.warn('Invalid event payload for TTS start', { event });
+      return;
+    }
+    await processJob({ jobId: maybeJobId });
+    return;
+  }
 
   for (const record of event.Records ?? []) {
     const bucketName = record.s3.bucket.name;
@@ -87,142 +248,6 @@ export const handler = async (event: S3Event): Promise<void> => {
       continue;
     }
 
-    const getObject = await s3.send(
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: objectKey,
-      }),
-    );
-
-    if (!getObject.Body) {
-      throw new Error(`Empty S3 object body: ${objectKey}`);
-    }
-
-    const text = await streamToString(getObject.Body as Readable);
-
-    const jobResult = await dynamo.send(
-      new QueryCommand({
-        TableName: JOBS_TABLE_NAME,
-        IndexName: 'GSI_JobId',
-        KeyConditionExpression: 'id = :id',
-        ExpressionAttributeValues: {
-          ':id': jobId,
-        },
-        Limit: 2,
-      }),
-    );
-
-    if (!jobResult.Items || jobResult.Items.length === 0) {
-      console.warn(`Job not found for id=${jobId}. Skipping.`);
-      continue;
-    }
-
-    if (jobResult.Items.length > 1) {
-      console.warn(`Multiple jobs found for id=${jobId}, using first.`);
-    }
-
-    const job = jobResult.Items[0] as {
-      pk: string;
-      sk: string;
-      id: string;
-      fileDict?: Record<string, string>;
-    };
-
-    const fileDict = (job.fileDict ?? {}) as Record<string, string>;
-    const ssmlBody = applyDictionary(text, fileDict);
-    const ssml = `<speak>${ssmlBody}</speak>`;
-
-    // Polly has length limits; if we exceed, mark the job as FAILED and stop (avoid repeated retries).
-    // We use total length as a conservative proxy (SSML tags still count toward total length).
-    const totalChars = ssml.length;
-    const MAX_TOTAL_CHARS = 200_000; // Polly StartSpeechSynthesisTask total input limit
-    if (totalChars > MAX_TOTAL_CHARS) {
-      const message = `Input too long for Polly: ${totalChars} chars (max ${MAX_TOTAL_CHARS}). Please split the text.`;
-      console.warn(message);
-      await dynamo.send(
-        new UpdateCommand({
-          TableName: JOBS_TABLE_NAME,
-          Key: { pk: job.pk, sk: job.sk },
-          UpdateExpression: 'SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt',
-          ExpressionAttributeNames: { '#status': 'status' },
-          ExpressionAttributeValues: {
-            ':status': 'FAILED',
-            ':errorMessage': message,
-            ':updatedAt': Date.now(),
-          },
-          ConditionExpression: 'attribute_exists(pk)',
-        }),
-      );
-      continue;
-    }
-
-    const epochMillis = Date.now();
-    // Polly appends a TaskId to the object name; OutputS3KeyPrefix is a *prefix*, not a full filename.
-    // e.g. files/audio/<jobId>/output-<epochMillis>.<TaskId>.mp3
-    const outputKeyPrefix = `${normalizePrefix(OUTPUT_PREFIX)}${jobId}/output-${epochMillis}`;
-
-    const voiceId = POLLY_VOICE_ID as VoiceId;
-
-    let taskId: string | undefined;
-    try {
-      const startTask = await polly.send(
-        new StartSpeechSynthesisTaskCommand({
-          OutputFormat: 'mp3',
-          OutputS3BucketName: FILES_BUCKET_NAME,
-          OutputS3KeyPrefix: outputKeyPrefix,
-          Text: ssml,
-          TextType: 'ssml',
-          VoiceId: voiceId,
-          Engine: POLLY_ENGINE === 'neural' ? 'neural' : 'standard',
-          SnsTopicArn: SNS_TOPIC_ARN,
-        }),
-      );
-
-      taskId = startTask.SynthesisTask?.TaskId;
-      if (!taskId) {
-        throw new Error(`Polly did not return TaskId for jobId=${jobId}`);
-      }
-    } catch (err) {
-      const e = err as { name?: string; message?: string };
-      const name = e?.name ?? 'UnknownError';
-      const message = e?.message ?? String(err);
-      console.error('Polly StartSpeechSynthesisTask failed', { jobId, name, message });
-
-      await dynamo.send(
-        new UpdateCommand({
-          TableName: JOBS_TABLE_NAME,
-          Key: { pk: job.pk, sk: job.sk },
-          UpdateExpression: 'SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt',
-          ExpressionAttributeNames: { '#status': 'status' },
-          ExpressionAttributeValues: {
-            ':status': 'FAILED',
-            ':errorMessage': `${name}: ${message}`,
-            ':updatedAt': Date.now(),
-          },
-          ConditionExpression: 'attribute_exists(pk)',
-        }),
-      );
-
-      // Do not throw; avoid S3 event retry storms.
-      continue;
-    }
-
-    await dynamo.send(
-      new UpdateCommand({
-        TableName: JOBS_TABLE_NAME,
-        Key: { pk: job.pk, sk: job.sk },
-        UpdateExpression:
-          'SET #status = :status, pollyTaskId = :pollyTaskId, outputEpochMillis = :outputEpochMillis, outputKeyPrefix = :outputKeyPrefix, updatedAt = :updatedAt',
-        ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: {
-          ':status': 'TTS_STARTED',
-          ':pollyTaskId': taskId,
-          ':outputEpochMillis': epochMillis,
-          ':outputKeyPrefix': outputKeyPrefix,
-          ':updatedAt': epochMillis,
-        },
-        ConditionExpression: 'attribute_exists(pk)',
-      }),
-    );
+    await processJob({ jobId, objectKey, bucketName });
   }
 };
