@@ -167,6 +167,8 @@ export class TextReaderStack extends cdk.Stack {
     });
     // SSR reads jobs list/status from DynamoDB
     jobsTable.grantReadData(frontendFunction);
+    // SSR issues presigned S3 GET URLs for generated audio
+    filesBucket.grantRead(frontendFunction, 'files/audio/*');
 
     const frontendFunctionUrl = frontendFunction.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.AWS_IAM,
