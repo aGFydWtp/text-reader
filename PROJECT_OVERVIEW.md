@@ -91,3 +91,8 @@
 - 認証関連パスはキャッシュ無効（またはCookie/Queryを全転送）
 - CloudFront→SSRオリジンでCookie転送を有効化
 - CognitoのCallback/Logout URLはCloudFrontドメインに合わせる
+- ローカル開発は `http://localhost:5173/auth/callback` と `http://localhost:5173/logout` を許可する
+- アプリ用ドメインとCognito用ドメインは分ける
+  - 例: アプリ `text-reader.hoge.com`（CloudFront）
+  - 例: 認証 `auth.text-reader.hoge.com`（Cognito Managed Login / RP ID）
+- Cognitoのカスタムドメイン証明書は us-east-1 のACMを使用する

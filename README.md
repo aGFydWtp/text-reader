@@ -23,6 +23,38 @@ pnpm -C cdk deploy:ecr
 FRONTEND_IMAGE_TAG=latest pnpm -C cdk deploy:app
 ```
 
+### Custom Domain (text-reader.app.hr20k.com)
+
+CloudFront and Cognito custom domains require the ACM certificate in us-east-1. The
+`deploy:acm` command creates both certificates in separate stacks.
+
+Recommended order and example commands:
+
+1) ECR
+```sh
+pnpm -C cdk deploy:ecr
+```
+
+2) ACM (CloudFront + Cognito, both in us-east-1)
+```sh
+pnpm -C cdk deploy:acm \
+  -c hostedZoneId=Z1234567890 \
+  -c hostedZoneName=app.hr20k.com \
+  -c customSubdomain=text-reader \
+  -c cognitoSubdomain=auth.text-reader
+```
+
+3) App stack (use the ARNs from step 2)
+```sh
+FRONTEND_IMAGE_TAG=latest pnpm -C cdk deploy:app \
+  -c hostedZoneId=Z1234567890 \
+  -c hostedZoneName=app.hr20k.com \
+  -c customSubdomain=text-reader \
+  -c certificateArn=arn:aws:acm:us-east-1:... \
+  -c cognitoDomainName=auth.text-reader.app.hr20k.com \
+  -c cognitoCertificateArn=arn:aws:acm:us-east-1:...
+```
+
 Deploy both in one command:
 
 ```sh

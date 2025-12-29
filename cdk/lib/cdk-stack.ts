@@ -1,13 +1,17 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
@@ -16,6 +20,17 @@ import * as path from 'path';
 export interface TextReaderStackProps extends cdk.StackProps {
   frontendRepository: ecr.IRepository;
   frontendImageTag: string;
+  customDomain?: {
+    hostedZoneId: string;
+    hostedZoneName: string;
+    domainName: string;
+    certificateArn: string;
+    recordName: string;
+  };
+  cognitoCustomDomain?: {
+    domainName: string;
+    certificateArn: string;
+  };
 }
 
 export class TextReaderStack extends cdk.Stack {
@@ -126,6 +141,14 @@ export class TextReaderStack extends cdk.Stack {
     const filesOrigin = origins.S3BucketOrigin.withOriginAccessControl(filesBucket);
     const frontendOrigin = origins.FunctionUrlOrigin.withOriginAccessControl(frontendFunctionUrl);
 
+    const certificate = props.customDomain
+      ? certificatemanager.Certificate.fromCertificateArn(
+          this,
+          'CustomDomainCertificate',
+          props.customDomain.certificateArn,
+        )
+      : undefined;
+
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
         origin: frontendOrigin,
@@ -141,7 +164,122 @@ export class TextReaderStack extends cdk.Stack {
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         },
       },
+      ...(props.customDomain
+        ? {
+            domainNames: [props.customDomain.domainName],
+            certificate,
+          }
+        : {}),
     });
+
+    if (props.customDomain) {
+      const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'CustomDomainHostedZone', {
+        hostedZoneId: props.customDomain.hostedZoneId,
+        zoneName: props.customDomain.hostedZoneName,
+      });
+
+      new route53.ARecord(this, 'CloudFrontAliasRecord', {
+        zone: hostedZone,
+        recordName: props.customDomain.recordName,
+        target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
+      });
+
+      new route53.AaaaRecord(this, 'CloudFrontAliasRecordIpv6', {
+        zone: hostedZone,
+        recordName: props.customDomain.recordName,
+        target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
+      });
+    }
+
+    const userPool = new cognito.UserPool(this, 'UserPool', {
+      featurePlan: cognito.FeaturePlan.ESSENTIALS,
+      mfa: cognito.Mfa.OFF,
+      signInPolicy: {
+        allowedFirstAuthFactors: {
+          password: true,
+          passkey: true,
+        },
+      },
+      passkeyUserVerification: cognito.PasskeyUserVerification.PREFERRED,
+    });
+
+    const cognitoDomainPrefix = props.cognitoCustomDomain
+      ? undefined
+      : new cdk.CfnParameter(this, 'CognitoDomainPrefix', {
+          type: 'String',
+          description: 'Unique domain prefix for Cognito hosted UI (Managed Login).',
+        });
+
+    const userPoolDomain = props.cognitoCustomDomain
+      ? userPool.addDomain('UserPoolDomain', {
+          customDomain: {
+            domainName: props.cognitoCustomDomain.domainName,
+            certificate: certificatemanager.Certificate.fromCertificateArn(
+              this,
+              'CognitoCustomDomainCertificate',
+              props.cognitoCustomDomain.certificateArn,
+            ),
+          },
+        })
+      : userPool.addDomain('UserPoolDomain', {
+          cognitoDomain: {
+            domainPrefix: cognitoDomainPrefix!.valueAsString,
+          },
+        });
+
+    const localBaseUrl = 'http://localhost:5173';
+    const callbackUrls = [
+      `https://${distribution.distributionDomainName}/auth/callback`,
+      `${localBaseUrl}/auth/callback`,
+    ];
+    const logoutUrls = [
+      `https://${distribution.distributionDomainName}/logout`,
+      `${localBaseUrl}/logout`,
+    ];
+
+    const userPoolClient = userPool.addClient('UserPoolClient', {
+      authFlows: {
+        user: true,
+      },
+      oAuth: {
+        flows: {
+          authorizationCodeGrant: true,
+        },
+        scopes: [
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.PROFILE,
+          cognito.OAuthScope.EMAIL,
+        ],
+        callbackUrls,
+        logoutUrls,
+      },
+      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
+    });
+
+    const userPoolCfn = userPool.node.defaultChild as cognito.CfnUserPool;
+    userPoolCfn.webAuthnRelyingPartyId = userPoolDomain.domainName;
+
+    if (props.cognitoCustomDomain && props.customDomain) {
+      const cognitoHostedZone = route53.HostedZone.fromHostedZoneAttributes(
+        this,
+        'CognitoHostedZone',
+        {
+          hostedZoneId: props.customDomain.hostedZoneId,
+          zoneName: props.customDomain.hostedZoneName,
+        },
+      );
+
+      const recordSuffix = `.${props.customDomain.hostedZoneName}`;
+      const recordName = props.cognitoCustomDomain.domainName.endsWith(recordSuffix)
+        ? props.cognitoCustomDomain.domainName.slice(0, -recordSuffix.length)
+        : props.cognitoCustomDomain.domainName;
+
+      new route53.CnameRecord(this, 'CognitoDomainRecord', {
+        zone: cognitoHostedZone,
+        recordName,
+        domainName: userPoolDomain.cloudFrontEndpoint,
+      });
+    }
 
     // 将来的に FunctionUrlOrigin.withOriginAccessControl(functionUrl); で自動で付与される可能性もある。（lambda:InvokeFunctionUrl は自動で付与されているため）
     frontendFunction.addPermission("AllowCloudFrontInvokeFunction", {
@@ -158,5 +296,8 @@ export class TextReaderStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DistributionDomainName', {
       value: distribution.distributionDomainName,
     });
+    new cdk.CfnOutput(this, 'CognitoUserPoolId', { value: userPool.userPoolId });
+    new cdk.CfnOutput(this, 'CognitoUserPoolClientId', { value: userPoolClient.userPoolClientId });
+    new cdk.CfnOutput(this, 'CognitoHostedUiDomain', { value: userPoolDomain.domainName });
   }
 }
