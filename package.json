@@ -19,5 +19,9 @@
 		"svelte-check": "^4.3.4",
 		"typescript": "^5.9.3",
 		"vite": "^7.2.6"
+	},
+	"dependencies": {
+		"@aws-sdk/client-dynamodb": "^3.879.0",
+		"@aws-sdk/lib-dynamodb": "^3.879.0"
 	}
 }

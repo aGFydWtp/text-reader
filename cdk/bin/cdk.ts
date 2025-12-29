@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import { TextReaderStack } from '../lib/cdk-stack';
 import { EcrStack } from '../lib/ecr-stack';
 import { TextReaderCloudFrontAcmStack, TextReaderCognitoAcmStack } from '../lib/acm-stack';
+import { TextReaderSecretsStack } from '../lib/secrets-stack';
 
 const app = new cdk.App();
 const frontendImageTag = app.node.tryGetContext('frontendImageTag') ?? 'latest';
@@ -56,11 +57,13 @@ const cognitoCustomDomain =
     : undefined;
 
 const ecrStack = new EcrStack(app, 'TextReaderEcrStack');
+const secretsStack = new TextReaderSecretsStack(app, 'TextReaderSecretsStack');
 const appStack = new TextReaderStack(app, 'TextReaderStack', {
   frontendRepository: ecrStack.frontendRepository,
   frontendImageTag,
   customDomain,
   cognitoCustomDomain,
+  googleOAuthSecret: secretsStack.googleOAuthSecret,
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */
@@ -77,4 +80,6 @@ const appStack = new TextReaderStack(app, 'TextReaderStack', {
 });
 
 cdk.Tags.of(ecrStack).add('Component', 'ecr');
+cdk.Tags.of(secretsStack).add('Component', 'secrets');
 appStack.addDependency(ecrStack);
+appStack.addDependency(secretsStack);

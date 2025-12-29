@@ -15,8 +15,8 @@ import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as path from 'path';
-
 
 export interface TextReaderStackProps extends cdk.StackProps {
   frontendRepository: ecr.IRepository;
@@ -32,6 +32,7 @@ export interface TextReaderStackProps extends cdk.StackProps {
     domainName: string;
     certificateArn: string;
   };
+  googleOAuthSecret: secretsmanager.ISecret;
 }
 
 interface CognitoDomainDnsNestedStackProps extends cdk.NestedStackProps {
@@ -237,6 +238,11 @@ export class TextReaderStack extends cdk.Stack {
       passkeyUserVerification: cognito.PasskeyUserVerification.PREFERRED,
     });
 
+    const googleClientId = new cdk.CfnParameter(this, 'GoogleClientId', {
+      type: 'String',
+      description: 'Google OAuth client ID for Cognito IdP.',
+    });
+
     const cognitoDomainPrefix = props.cognitoCustomDomain
       ? undefined
       : new cdk.CfnParameter(this, 'CognitoDomainPrefix', {
@@ -273,6 +279,18 @@ export class TextReaderStack extends cdk.Stack {
       }
     }
 
+    const googleProvider = new cognito.UserPoolIdentityProviderGoogle(this, 'GoogleIdentityProvider', {
+      userPool,
+      clientId: googleClientId.valueAsString,
+      clientSecretValue: props.googleOAuthSecret.secretValue,
+      scopes: ['openid', 'email', 'profile'],
+      attributeMapping: {
+        email: cognito.ProviderAttribute.GOOGLE_EMAIL,
+        givenName: cognito.ProviderAttribute.GOOGLE_GIVEN_NAME,
+        familyName: cognito.ProviderAttribute.GOOGLE_FAMILY_NAME,
+      },
+    });
+
     const localBaseUrl = 'http://localhost:5173';
     const callbackUrls = [
       `https://${distribution.distributionDomainName}/auth/callback`,
@@ -299,8 +317,9 @@ export class TextReaderStack extends cdk.Stack {
         callbackUrls,
         logoutUrls,
       },
-      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
+      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.GOOGLE],
     });
+    userPoolClient.node.addDependency(googleProvider);
 
     const userPoolCfn = userPool.node.defaultChild as cognito.CfnUserPool;
     userPoolCfn.webAuthnRelyingPartyId = props.cognitoCustomDomain

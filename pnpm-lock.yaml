@@ -7,6 +7,13 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.879.0
+        version: 3.958.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: ^3.879.0
+        version: 3.958.0(@aws-sdk/client-dynamodb@3.958.0)
     devDependencies:
       '@sveltejs/adapter-node':
         specifier: ^5.3.2
