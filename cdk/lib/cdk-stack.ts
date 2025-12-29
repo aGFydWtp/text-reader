@@ -17,6 +17,7 @@ import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as path from 'path';
 
+
 export interface TextReaderStackProps extends cdk.StackProps {
   frontendRepository: ecr.IRepository;
   frontendImageTag: string;
@@ -31,6 +32,36 @@ export interface TextReaderStackProps extends cdk.StackProps {
     domainName: string;
     certificateArn: string;
   };
+}
+
+interface CognitoDomainDnsNestedStackProps extends cdk.NestedStackProps {
+  hostedZoneId: string;
+  hostedZoneName: string;
+  fullDomainName: string; // e.g. auth.app.hr20k.com
+  targetDomainName: string; // Cognito UserPoolDomain CloudFront endpoint
+}
+
+class CognitoDomainDnsNestedStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: CognitoDomainDnsNestedStackProps) {
+    super(scope, id, props);
+
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+      hostedZoneId: props.hostedZoneId,
+      zoneName: props.hostedZoneName,
+    });
+
+    // Route 53 recordName should be relative to the hosted zone.
+    const recordSuffix = `.${props.hostedZoneName}`;
+    const recordName = props.fullDomainName.endsWith(recordSuffix)
+      ? props.fullDomainName.slice(0, -recordSuffix.length)
+      : props.fullDomainName;
+
+    new route53.CnameRecord(this, 'CognitoDomainRecord', {
+      zone: hostedZone,
+      recordName,
+      domainName: props.targetDomainName,
+    });
+  }
 }
 
 export class TextReaderStack extends cdk.Stack {
@@ -172,19 +203,22 @@ export class TextReaderStack extends cdk.Stack {
         : {}),
     });
 
+    let cloudFrontAliasRecord: route53.ARecord | undefined;
+    let cloudFrontAliasRecordIpv6: route53.AaaaRecord | undefined;
+
     if (props.customDomain) {
       const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'CustomDomainHostedZone', {
         hostedZoneId: props.customDomain.hostedZoneId,
         zoneName: props.customDomain.hostedZoneName,
       });
 
-      new route53.ARecord(this, 'CloudFrontAliasRecord', {
+      cloudFrontAliasRecord = new route53.ARecord(this, 'CloudFrontAliasRecord', {
         zone: hostedZone,
         recordName: props.customDomain.recordName,
         target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
       });
 
-      new route53.AaaaRecord(this, 'CloudFrontAliasRecordIpv6', {
+      cloudFrontAliasRecordIpv6 = new route53.AaaaRecord(this, 'CloudFrontAliasRecordIpv6', {
         zone: hostedZone,
         recordName: props.customDomain.recordName,
         target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
@@ -227,6 +261,18 @@ export class TextReaderStack extends cdk.Stack {
           },
         });
 
+    // Cognito custom domain creation requires the parent domain to have a resolvable A record.
+    // Ensure Route53 alias records for the parent domain are created before creating the Cognito UserPoolDomain.
+    if (props.cognitoCustomDomain && props.customDomain) {
+      const userPoolDomainCfn = userPoolDomain.node.defaultChild as cognito.CfnUserPoolDomain;
+      if (cloudFrontAliasRecord) {
+        userPoolDomainCfn.addDependency(cloudFrontAliasRecord.node.defaultChild as route53.CfnRecordSet);
+      }
+      if (cloudFrontAliasRecordIpv6) {
+        userPoolDomainCfn.addDependency(cloudFrontAliasRecordIpv6.node.defaultChild as route53.CfnRecordSet);
+      }
+    }
+
     const localBaseUrl = 'http://localhost:5173';
     const callbackUrls = [
       `https://${distribution.distributionDomainName}/auth/callback`,
@@ -257,27 +303,18 @@ export class TextReaderStack extends cdk.Stack {
     });
 
     const userPoolCfn = userPool.node.defaultChild as cognito.CfnUserPool;
-    userPoolCfn.webAuthnRelyingPartyId = userPoolDomain.domainName;
+    userPoolCfn.webAuthnRelyingPartyId = props.cognitoCustomDomain
+      ? props.cognitoCustomDomain.domainName
+      : cdk.Fn.sub('${Prefix}.auth.${AWS::Region}.amazoncognito.com', {
+          Prefix: cognitoDomainPrefix!.valueAsString,
+        });
 
     if (props.cognitoCustomDomain && props.customDomain) {
-      const cognitoHostedZone = route53.HostedZone.fromHostedZoneAttributes(
-        this,
-        'CognitoHostedZone',
-        {
-          hostedZoneId: props.customDomain.hostedZoneId,
-          zoneName: props.customDomain.hostedZoneName,
-        },
-      );
-
-      const recordSuffix = `.${props.customDomain.hostedZoneName}`;
-      const recordName = props.cognitoCustomDomain.domainName.endsWith(recordSuffix)
-        ? props.cognitoCustomDomain.domainName.slice(0, -recordSuffix.length)
-        : props.cognitoCustomDomain.domainName;
-
-      new route53.CnameRecord(this, 'CognitoDomainRecord', {
-        zone: cognitoHostedZone,
-        recordName,
-        domainName: userPoolDomain.cloudFrontEndpoint,
+      new CognitoDomainDnsNestedStack(this, 'CognitoDomainDns', {
+        hostedZoneId: props.customDomain.hostedZoneId,
+        hostedZoneName: props.customDomain.hostedZoneName,
+        fullDomainName: props.cognitoCustomDomain.domainName,
+        targetDomainName: userPoolDomain.cloudFrontEndpoint,
       });
     }
 
