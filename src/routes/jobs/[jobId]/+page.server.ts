@@ -49,13 +49,16 @@ export const actions: Actions = {
 
     const jobId = params.jobId;
     const formData = await request.formData();
-    const keys = formData.getAll('dictKey').map((value) => String(value).trim());
+    const keys = formData.getAll('dictKey').map((value) => String(value));
     const values = formData.getAll('dictValue').map((value) => String(value));
 
     const fileDict: Record<string, string> = {};
     keys.forEach((key, index) => {
-      if (!key) return;
-      fileDict[key] = values[index] ?? '';
+      const normalizedKey = key.trim();
+      const normalizedValue = (values[index] ?? '').trim();
+      if (!normalizedKey && !normalizedValue) return;
+      if (!normalizedKey) return;
+      fileDict[normalizedKey] = normalizedValue;
     });
 
     const { error: updateError } = await updateJobDictionary({

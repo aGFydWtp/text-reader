@@ -2,7 +2,7 @@
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
-  const jobs = data.jobs;
+  const jobs = $derived(data.jobs);
 </script>
 
 <section class="page">

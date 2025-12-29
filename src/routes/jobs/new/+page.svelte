@@ -3,14 +3,14 @@
 
   type InputMode = 'file' | 'clipboard';
 
-  let file: File | null = null;
-  let fileInput: HTMLInputElement | null = null;
-  let inputMode: InputMode = 'file';
-  let clipboardText = '';
-  let clipboardFilename = '';
-  let charCount = 0;
-  let status: 'idle' | 'registering' | 'uploading' | 'done' | 'error' = 'idle';
-  let message = '';
+  let file = $state<File | null>(null);
+  let fileInput = $state<HTMLInputElement | null>(null);
+  let inputMode = $state<InputMode>('file');
+  let clipboardText = $state('');
+  let clipboardFilename = $state('');
+  const charCount = $derived(clipboardText.length);
+  let status = $state<'idle' | 'registering' | 'uploading' | 'done' | 'error'>('idle');
+  let message = $state('');
 
   function onFileChange(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
@@ -27,16 +27,10 @@
     status = 'idle';
   }
 
-  function onClipboardFilenameChange(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    clipboardFilename = input.value;
-  }
-
   async function pasteFromClipboard() {
     try {
       const text = await navigator.clipboard.readText();
       clipboardText = text;
-      charCount = text.length;
       message = '';
       if (!clipboardFilename) {
         clipboardFilename = `clipboard-${Date.now()}.txt`;
@@ -50,11 +44,14 @@
   function resetInputs() {
     file = null;
     clipboardText = '';
-    charCount = 0;
     clipboardFilename = '';
     if (fileInput) {
       fileInput.value = '';
     }
+  }
+
+  function asString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined;
   }
 
   const handleEnhance = (form: HTMLFormElement) =>
@@ -89,11 +86,13 @@
     return async ({ result }) => {
       if (result.type !== 'success') {
         status = 'error';
-        message = result.type === 'failure' ? result.data?.error ?? '登録に失敗しました。' : '登録に失敗しました。';
+        const errorFromAction =
+          result.type === 'failure' ? asString((result.data as any)?.error) : undefined;
+        message = errorFromAction ?? '登録に失敗しました。';
         return;
       }
 
-      const uploadUrl = result.data?.uploadUrl as string | undefined;
+      const uploadUrl = asString((result.data as any)?.uploadUrl);
       if (!uploadUrl) {
         status = 'error';
         message = 'アップロードURLの取得に失敗しました。';
@@ -143,14 +142,14 @@
       <button
         type="button"
         class:active={inputMode === 'file'}
-        on:click={() => onModeChange('file')}
+        onclick={() => onModeChange('file')}
       >
         ファイル
       </button>
       <button
         type="button"
         class:active={inputMode === 'clipboard'}
-        on:click={() => onModeChange('clipboard')}
+        onclick={() => onModeChange('clipboard')}
       >
         クリップボード
       </button>
@@ -164,7 +163,7 @@
           type="file"
           name="file"
           accept=".txt,text/plain"
-          on:change={onFileChange}
+          onchange={onFileChange}
         />
       </label>
     {:else}
@@ -174,12 +173,11 @@
           class="input"
           type="text"
           placeholder="clipboard.txt"
-          value={clipboardFilename}
-          on:input={onClipboardFilenameChange}
+          bind:value={clipboardFilename}
         />
       </label>
       <div class="clipboard">
-        <button type="button" class="ghost" on:click={pasteFromClipboard}>
+        <button type="button" class="ghost" onclick={pasteFromClipboard}>
           クリップボードから貼り付け
         </button>
         <span class="muted">文字数: {charCount}</span>
