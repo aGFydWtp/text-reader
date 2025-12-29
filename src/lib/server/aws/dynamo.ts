@@ -11,6 +11,7 @@ export type JobItem = {
   updatedAt?: string | number;
   latestAudioCreatedAt?: string;
   latestAudioKey?: string;
+  uploadKey?: string;
   fileDict?: Record<string, string>;
   errorMessage?: string;
 };

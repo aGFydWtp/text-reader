@@ -2,6 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { error, fail } from '@sveltejs/kit';
 import { createDownloadUrl } from '$lib/server/aws/s3';
 import { getJobForUser, updateJobDictionary } from '$lib/server/aws/dynamo';
+import { invokeTtsStart } from '$lib/server/aws/lambda';
 
 function toDictEntries(fileDict: Record<string, string> | undefined) {
   const entries = Object.entries(fileDict ?? {}).map(([key, value]) => ({ key, value }));
@@ -67,6 +68,11 @@ export const actions: Actions = {
       return fail(500, { error: updateError });
     }
 
-    return { success: true };
+    const { error: invokeError } = await invokeTtsStart(jobId);
+    if (invokeError) {
+      return { success: true, warning: invokeError };
+    }
+
+    return { success: true, started: true };
   },
 };

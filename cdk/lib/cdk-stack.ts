@@ -171,6 +171,8 @@ export class TextReaderStack extends cdk.Stack {
     filesBucket.grantRead(frontendFunction, 'files/audio/*');
     // SSR issues presigned S3 PUT URLs for uploads
     filesBucket.grantPut(frontendFunction, 'files/uploaded/*');
+    // SSR triggers TTS start for re-generation
+    ttsStartFunction.grantInvoke(frontendFunction);
 
     const frontendFunctionUrl = frontendFunction.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.AWS_IAM,
@@ -355,6 +357,7 @@ export class TextReaderStack extends cdk.Stack {
     frontendFunction.addEnvironment('COGNITO_CLIENT_ID', userPoolClient.userPoolClientId);
     frontendFunction.addEnvironment('COGNITO_ISSUER', userPool.userPoolProviderUrl);
     frontendFunction.addEnvironment('PUBLIC_APP_ORIGIN', publicAppOrigin);
+    frontendFunction.addEnvironment('TTS_START_FUNCTION_NAME', ttsStartFunction.functionName);
 
     const userPoolCfn = userPool.node.defaultChild as cognito.CfnUserPool;
     userPoolCfn.webAuthnRelyingPartyId = props.cognitoCustomDomain

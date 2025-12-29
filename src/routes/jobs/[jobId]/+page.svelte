@@ -83,6 +83,10 @@
     <button class="primary" type="submit">設定を保存</button>
     {#if form?.error}
       <p class="notice error">{form.error}</p>
+    {:else if form?.warning}
+      <p class="notice warning">保存しました。再生成の開始に失敗しました: {form.warning}</p>
+    {:else if form?.started}
+      <p class="notice">保存しました。再生成を開始しました。</p>
     {:else if form?.success}
       <p class="notice">保存しました。</p>
     {/if}
@@ -228,5 +232,9 @@
 
   .notice.error {
     color: #9c2c12;
+  }
+
+  .notice.warning {
+    color: #8a5a12;
   }
 </style>
