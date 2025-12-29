@@ -57,6 +57,8 @@ export class TextReaderStack extends cdk.Stack {
         SNS_TOPIC_ARN: ttsCompleteTopic.topicArn,
         UPLOAD_PREFIX: 'files/uploaded/',
         OUTPUT_PREFIX: 'files/audio/',
+        POLLY_VOICE_ID: 'Takumi',
+        POLLY_ENGINE: 'neural',
       },
     });
 
