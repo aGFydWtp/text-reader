@@ -158,8 +158,8 @@ export const handler = async (event: S3Event): Promise<void> => {
 
     const epochMillis = Date.now();
     // Polly appends a TaskId to the object name; OutputS3KeyPrefix is a *prefix*, not a full filename.
-    // e.g. files/audio/<jobId>/output-<epochMillis>-<TaskId>.mp3
-    const outputKeyPrefix = `${normalizePrefix(OUTPUT_PREFIX)}${jobId}/output-${epochMillis}-`;
+    // e.g. files/audio/<jobId>/output-<epochMillis>.<TaskId>.mp3
+    const outputKeyPrefix = `${normalizePrefix(OUTPUT_PREFIX)}${jobId}/output-${epochMillis}`;
 
     const voiceId = POLLY_VOICE_ID as VoiceId;
 

@@ -16,6 +16,24 @@ const ensureRequiredEnv = () => {
 
 const normalizePrefix = (prefix: string): string => (prefix.endsWith('/') ? prefix : `${prefix}/`);
 
+const extractKeyFromOutputUri = (outputUri?: string): string | null => {
+  if (!outputUri) return null;
+  try {
+    if (outputUri.startsWith('s3://')) {
+      const withoutScheme = outputUri.slice('s3://'.length);
+      const [, ...keyParts] = withoutScheme.split('/');
+      return keyParts.join('/');
+    }
+
+    const url = new URL(outputUri);
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+    return parts.slice(1).join('/');
+  } catch {
+    return null;
+  }
+};
+
 const extractTaskId = (message: string): string | null => {
   try {
     const parsed = JSON.parse(message);
@@ -63,6 +81,7 @@ export const handler = async (event: SNSEvent): Promise<void> => {
       sk: string;
       id: string;
       outputEpochMillis?: number;
+      outputKeyPrefix?: string;
     };
 
     if (!job.outputEpochMillis) {
@@ -87,10 +106,15 @@ export const handler = async (event: SNSEvent): Promise<void> => {
       continue;
     }
 
-    const audioKey = `${normalizePrefix(OUTPUT_PREFIX)}${job.id}/output-${job.outputEpochMillis}.mp3`;
     const now = Date.now();
 
     if (status === 'completed') {
+      const outputKeyFromPolly = extractKeyFromOutputUri(pollyTask.SynthesisTask?.OutputUri ?? undefined);
+      const audioKey =
+        outputKeyFromPolly ??
+        (job.outputKeyPrefix && taskId ? `${job.outputKeyPrefix}.${taskId}.mp3` : null) ??
+        `${normalizePrefix(OUTPUT_PREFIX)}${job.id}/output-${job.outputEpochMillis}.mp3`;
+
       await dynamo.send(
         new UpdateCommand({
           TableName: JOBS_TABLE_NAME,
