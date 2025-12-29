@@ -11,7 +11,8 @@
     "cdk": "cdk",
     "deploy:ecr": "cdk deploy TextReaderEcrStack",
     "deploy:app": "cdk deploy TextReaderStack -c frontendImageTag=${FRONTEND_IMAGE_TAG:-latest}",
-    "deploy:all": "cdk deploy TextReaderEcrStack TextReaderStack -c frontendImageTag=${FRONTEND_IMAGE_TAG:-latest}"
+    "deploy:all": "cdk deploy TextReaderEcrStack TextReaderStack -c frontendImageTag=${FRONTEND_IMAGE_TAG:-latest}",
+    "destroy:app": "cdk destroy TextReaderStack -c frontendImageTag=${FRONTEND_IMAGE_TAG:-latest}"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.150",
