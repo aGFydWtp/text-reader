@@ -8,7 +8,7 @@
 <section class="page">
   <div class="page-header">
     <h1>My Files</h1>
-    <a class="new-link" href="/files/new">ファイル登録</a>
+    <a class="new-link" href="/jobs/new">ファイル登録</a>
   </div>
 
   {#if data.error}

@@ -40,7 +40,7 @@ export async function listJobsForUser(userSub: string): Promise<{
     const sorted = items.sort((a, b) => {
       const aTime = a.updatedAt ?? '';
       const bTime = b.updatedAt ?? '';
-      return bTime.localeCompare(aTime);
+      return String(bTime).localeCompare(String(aTime));
     });
 
     return { items: sorted };

@@ -2,6 +2,7 @@
   import { enhance } from '$app/forms';
 
   let file: File | null = null;
+  let fileInput: HTMLInputElement | null = null;
   let status: 'idle' | 'registering' | 'uploading' | 'done' | 'error' = 'idle';
   let message = '';
 
@@ -14,7 +15,8 @@
     }
   }
 
-  const handleEnhance = enhance(({ data, cancel }) => {
+  const handleEnhance = (form: HTMLFormElement) =>
+    enhance(form, ({ formData, cancel }) => {
     if (!file) {
       cancel();
       status = 'error';
@@ -22,8 +24,8 @@
       return;
     }
 
-    data.set('filename', file.name);
-    data.set('contentType', file.type || 'application/octet-stream');
+    formData.set('filename', file.name);
+    formData.set('contentType', file.type || 'application/octet-stream');
     status = 'registering';
 
     return async ({ result }) => {
@@ -59,6 +61,10 @@
 
       status = 'done';
       message = 'アップロードが完了しました。処理の反映まで少しお待ちください。';
+      file = null;
+      if (fileInput) {
+        fileInput.value = '';
+      }
     };
   });
 </script>
@@ -72,10 +78,16 @@
     <a class="back" href="/">一覧へ戻る</a>
   </div>
 
-  <form class="form" method="post" use:handleEnhance>
+  <form class="form" method="post" enctype="multipart/form-data" use:handleEnhance>
     <label class="field">
       <span>テキストファイル</span>
-      <input type="file" name="file" accept=".txt,text/plain" on:change={onFileChange} />
+      <input
+        bind:this={fileInput}
+        type="file"
+        name="file"
+        accept=".txt,text/plain"
+        on:change={onFileChange}
+      />
     </label>
 
     <button type="submit" disabled={status === 'registering' || status === 'uploading'}>
