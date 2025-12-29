@@ -1,7 +1,7 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { PollyClient, StartSpeechSynthesisTaskCommand, VoiceId } from '@aws-sdk/client-polly';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { S3Event } from 'aws-lambda';
 import type { Readable } from 'node:stream';
 
@@ -101,18 +101,34 @@ export const handler = async (event: S3Event): Promise<void> => {
     const text = await streamToString(getObject.Body as Readable);
 
     const jobResult = await dynamo.send(
-      new GetCommand({
+      new QueryCommand({
         TableName: JOBS_TABLE_NAME,
-        Key: { id: jobId },
+        IndexName: 'GSI_JobId',
+        KeyConditionExpression: 'id = :id',
+        ExpressionAttributeValues: {
+          ':id': jobId,
+        },
+        Limit: 2,
       }),
     );
 
-    if (!jobResult.Item) {
+    if (!jobResult.Items || jobResult.Items.length === 0) {
       console.warn(`Job not found for id=${jobId}. Skipping.`);
       continue;
     }
 
-    const fileDict = (jobResult.Item.fileDict ?? {}) as Record<string, string>;
+    if (jobResult.Items.length > 1) {
+      console.warn(`Multiple jobs found for id=${jobId}, using first.`);
+    }
+
+    const job = jobResult.Items[0] as {
+      pk: string;
+      sk: string;
+      id: string;
+      fileDict?: Record<string, string>;
+    };
+
+    const fileDict = (job.fileDict ?? {}) as Record<string, string>;
     const ssmlBody = applyDictionary(text, fileDict);
     const ssml = `<speak>${ssmlBody}</speak>`;
 
@@ -141,7 +157,7 @@ export const handler = async (event: S3Event): Promise<void> => {
     await dynamo.send(
       new UpdateCommand({
         TableName: JOBS_TABLE_NAME,
-        Key: { id: jobId },
+        Key: { pk: job.pk, sk: job.sk },
         UpdateExpression:
           'SET #status = :status, pollyTaskId = :pollyTaskId, outputEpochMillis = :outputEpochMillis, updatedAt = :updatedAt',
         ExpressionAttributeNames: { '#status': 'status' },
@@ -151,7 +167,7 @@ export const handler = async (event: S3Event): Promise<void> => {
           ':outputEpochMillis': epochMillis,
           ':updatedAt': epochMillis,
         },
-        ConditionExpression: 'attribute_exists(id)',
+        ConditionExpression: 'attribute_exists(pk)',
       }),
     );
   }

@@ -14,8 +14,11 @@
 
 ## データストア設計
 ### DynamoDB（jobsテーブル）
-- PK: `id`（UUID）
+- PK: `pk`（`USER#<cognitoSub>`）
+- SK: `sk`（`JOB#<jobUuid>`）
 - 必須カラム:
+  - `pk`
+  - `sk`
   - `id`
   - `filename`
   - `uploadKey` = `files/uploaded/:id/:filename`
@@ -28,16 +31,18 @@
   - `errorMessage`
   - `createdAt`, `updatedAt`
 - GSI:
-  - `GSI_PollyTaskId`（PK: `pollyTaskId`、SKなし。SNS完了通知からジョブを引くため）
+  - `GSI_PollyTaskId`（PK: `pollyTaskId`、SK: `pk`。SNS完了通知からジョブを引くため）
+  - `GSI_JobId`（PK: `id`。S3イベントからジョブを引くため）
 
 ## イベント駆動フロー
 1. SSR API（SvelteKit on Lambda Web Adapter）
    - UUID発行
-   - `jobs` 作成（初期 `status`）
+   - `jobs` 作成（`pk=USER#<cognitoSub>`, `sk=JOB#<jobUuid>`, 初期 `status`）
    - `files/uploaded/:id/:filename` への presigned PUT 発行
 2. ブラウザ → S3（`files/uploaded/…`）
    - 直アップロード
 3. S3 `files/uploaded/…` → TTS開始Lambda
+   - `id` で `jobs` を検索（GSI）
    - `status` を `TTS_STARTED` に更新
    - テキスト取得
    - `fileDict` を反映して SSML生成（完全一致置換 → `<sub alias="...">原文</sub>`）
@@ -70,3 +75,19 @@
 - S3は単一バケット運用（`files/` プレフィックスで分離）
 - DynamoDBにはURLを保存せず、`latestAudioKey` のみ保存
 - 再生時は SSR API が `latestAudioKey` から署名付きURLを都度発行し `<audio>` に渡す
+
+## フロントエンド認証（SvelteKit SSR + Cognito）
+### 推奨方針
+- Cognito Hosted UI（Managed Login）+ Authorization Code Grant（PKCE）
+- トークンはブラウザに保持せず、SSR側で交換して HttpOnly + Secure cookie に保存
+- `hooks.server.ts` でcookie検証して `event.locals.user` をセット、`+layout.server.ts` で保護
+
+### 実装方針（自前の薄いOIDC実装）
+- `/login` → Hosted UIへリダイレクト
+- `/auth/callback` → code交換 → cookie保存
+- `/logout` → cookie削除 + Cognito logout
+
+### CloudFront構成での注意点
+- 認証関連パスはキャッシュ無効（またはCookie/Queryを全転送）
+- CloudFront→SSRオリジンでCookie転送を有効化
+- CognitoのCallback/Logout URLはCloudFrontドメインに合わせる

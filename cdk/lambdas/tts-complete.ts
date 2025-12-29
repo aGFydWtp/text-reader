@@ -59,6 +59,8 @@ export const handler = async (event: SNSEvent): Promise<void> => {
     }
 
     const job = queryResult.Items[0] as {
+      pk: string;
+      sk: string;
       id: string;
       outputEpochMillis?: number;
     };
@@ -92,7 +94,7 @@ export const handler = async (event: SNSEvent): Promise<void> => {
       await dynamo.send(
         new UpdateCommand({
           TableName: JOBS_TABLE_NAME,
-          Key: { id: job.id },
+          Key: { pk: job.pk, sk: job.sk },
           UpdateExpression:
             'SET #status = :status, latestAudioKey = :latestAudioKey, latestAudioCreatedAt = :latestAudioCreatedAt, updatedAt = :updatedAt',
           ExpressionAttributeNames: { '#status': 'status' },
@@ -115,7 +117,7 @@ export const handler = async (event: SNSEvent): Promise<void> => {
     await dynamo.send(
       new UpdateCommand({
         TableName: JOBS_TABLE_NAME,
-        Key: { id: job.id },
+        Key: { pk: job.pk, sk: job.sk },
         UpdateExpression:
           'SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt',
         ExpressionAttributeNames: { '#status': 'status' },

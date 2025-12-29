@@ -35,13 +35,20 @@ export class TextReaderStack extends cdk.Stack {
     });
 
     const jobsTable = new dynamodb.Table(this, 'JobsTable', {
-      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     });
 
     jobsTable.addGlobalSecondaryIndex({
       indexName: 'GSI_PollyTaskId',
       partitionKey: { name: 'pollyTaskId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
+    });
+
+    jobsTable.addGlobalSecondaryIndex({
+      indexName: 'GSI_JobId',
+      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
     });
 
     const ttsCompleteTopic = new sns.Topic(this, 'TtsCompleteTopic');
