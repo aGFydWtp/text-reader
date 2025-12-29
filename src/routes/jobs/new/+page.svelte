@@ -1,8 +1,14 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
 
+  type InputMode = 'file' | 'clipboard';
+
   let file: File | null = null;
   let fileInput: HTMLInputElement | null = null;
+  let inputMode: InputMode = 'file';
+  let clipboardText = '';
+  let clipboardFilename = '';
+  let charCount = 0;
   let status: 'idle' | 'registering' | 'uploading' | 'done' | 'error' = 'idle';
   let message = '';
 
@@ -15,17 +21,69 @@
     }
   }
 
+  function onModeChange(mode: InputMode) {
+    inputMode = mode;
+    message = '';
+    status = 'idle';
+  }
+
+  function onClipboardFilenameChange(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    clipboardFilename = input.value;
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      clipboardText = text;
+      charCount = text.length;
+      message = '';
+      if (!clipboardFilename) {
+        clipboardFilename = `clipboard-${Date.now()}.txt`;
+      }
+    } catch {
+      status = 'error';
+      message = 'クリップボードの読み取りに失敗しました。';
+    }
+  }
+
+  function resetInputs() {
+    file = null;
+    clipboardText = '';
+    charCount = 0;
+    clipboardFilename = '';
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  }
+
   const handleEnhance = (form: HTMLFormElement) =>
     enhance(form, ({ formData, cancel }) => {
-    if (!file) {
-      cancel();
-      status = 'error';
-      message = 'ファイルを選択してください。';
-      return;
+    if (inputMode === 'file') {
+      if (!file) {
+        cancel();
+        status = 'error';
+        message = 'ファイルを選択してください。';
+        return;
+      }
+      formData.set('filename', file.name);
+      formData.set('contentType', file.type || 'text/plain');
+    } else {
+      if (!clipboardText) {
+        cancel();
+        status = 'error';
+        message = 'クリップボードのテキストを取得してください。';
+        return;
+      }
+      if (!clipboardFilename) {
+        cancel();
+        status = 'error';
+        message = 'ファイル名を入力してください。';
+        return;
+      }
+      formData.set('filename', clipboardFilename);
+      formData.set('contentType', 'text/plain');
     }
-
-    formData.set('filename', file.name);
-    formData.set('contentType', file.type || 'application/octet-stream');
     status = 'registering';
 
     return async ({ result }) => {
@@ -45,12 +103,17 @@
       status = 'uploading';
       message = 'アップロード中...';
 
+      const body =
+        inputMode === 'file'
+          ? file
+          : new Blob([clipboardText], { type: 'text/plain' });
+
       const response = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
-          'content-type': file?.type || 'application/octet-stream',
+          'content-type': inputMode === 'file' ? file?.type || 'text/plain' : 'text/plain',
         },
-        body: file,
+        body,
       });
 
       if (!response.ok) {
@@ -61,10 +124,7 @@
 
       status = 'done';
       message = 'アップロードが完了しました。処理の反映まで少しお待ちください。';
-      file = null;
-      if (fileInput) {
-        fileInput.value = '';
-      }
+      resetInputs();
     };
   });
 </script>
@@ -79,16 +139,52 @@
   </div>
 
   <form class="form" method="post" enctype="multipart/form-data" use:handleEnhance>
-    <label class="field">
-      <span>テキストファイル</span>
-      <input
-        bind:this={fileInput}
-        type="file"
-        name="file"
-        accept=".txt,text/plain"
-        on:change={onFileChange}
-      />
-    </label>
+    <div class="segment">
+      <button
+        type="button"
+        class:active={inputMode === 'file'}
+        on:click={() => onModeChange('file')}
+      >
+        ファイル
+      </button>
+      <button
+        type="button"
+        class:active={inputMode === 'clipboard'}
+        on:click={() => onModeChange('clipboard')}
+      >
+        クリップボード
+      </button>
+    </div>
+
+    {#if inputMode === 'file'}
+      <label class="field">
+        <span>テキストファイル</span>
+        <input
+          bind:this={fileInput}
+          type="file"
+          name="file"
+          accept=".txt,text/plain"
+          on:change={onFileChange}
+        />
+      </label>
+    {:else}
+      <label class="field">
+        <span>ファイル名</span>
+        <input
+          class="input"
+          type="text"
+          placeholder="clipboard.txt"
+          value={clipboardFilename}
+          on:input={onClipboardFilenameChange}
+        />
+      </label>
+      <div class="clipboard">
+        <button type="button" class="ghost" on:click={pasteFromClipboard}>
+          クリップボードから貼り付け
+        </button>
+        <span class="muted">文字数: {charCount}</span>
+      </div>
+    {/if}
 
     <button type="submit" disabled={status === 'registering' || status === 'uploading'}>
       {#if status === 'registering'}
@@ -145,6 +241,29 @@
     max-width: 520px;
   }
 
+  .segment {
+    display: flex;
+    gap: 8px;
+    background: #f4efe7;
+    padding: 4px;
+    border-radius: 999px;
+    width: fit-content;
+  }
+
+  .segment button {
+    border: none;
+    background: transparent;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #6b645c;
+  }
+
+  .segment button.active {
+    background: #1d1d1d;
+    color: #fff;
+  }
+
   .field {
     display: grid;
     gap: 8px;
@@ -155,6 +274,14 @@
     padding: 8px;
     border-radius: 10px;
     border: 1px solid #ded6cc;
+    background: #fff;
+  }
+
+  .input {
+    border-radius: 12px;
+    border: 1px solid #ded6cc;
+    padding: 10px 12px;
+    font-size: 14px;
     background: #fff;
   }
 
@@ -170,6 +297,27 @@
   button:disabled {
     background: #8e877f;
     cursor: not-allowed;
+  }
+
+  .clipboard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .ghost {
+    border: 1px solid #d8d0c6;
+    background: transparent;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #5b4b32;
+  }
+
+  .muted {
+    color: #6b645c;
+    font-size: 12px;
   }
 
   .notice {
