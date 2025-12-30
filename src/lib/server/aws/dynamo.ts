@@ -127,10 +127,25 @@ export async function updateJobDictionary(payload: {
   jobId: string;
   fileDict: Record<string, string>;
 }): Promise<{ error?: string }> {
+  const hasDictEntries = Object.keys(payload.fileDict).length > 0;
+  const nowIso = new Date().toISOString();
+
   try {
     if (!env.JOBS_TABLE_NAME) {
       return { error: 'JOBS_TABLE_NAME is not set' };
     }
+
+    const expressionAttributeValues: Record<string, string | Record<string, string>> = {
+      ':updatedAt': nowIso,
+    };
+
+    if (hasDictEntries) {
+      expressionAttributeValues[':fileDict'] = payload.fileDict;
+    }
+
+    const updateExpression = hasDictEntries
+      ? 'SET fileDict = :fileDict, updatedAt = :updatedAt'
+      : 'SET updatedAt = :updatedAt REMOVE fileDict';
 
     await docClient.send(
       new UpdateCommand({
@@ -139,11 +154,8 @@ export async function updateJobDictionary(payload: {
           pk: `USER#${payload.userSub}`,
           sk: `JOB#${payload.jobId}`,
         },
-        UpdateExpression: 'SET fileDict = :fileDict, updatedAt = :updatedAt',
-        ExpressionAttributeValues: {
-          ':fileDict': payload.fileDict,
-          ':updatedAt': new Date().toISOString(),
-        },
+        UpdateExpression: updateExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
         ConditionExpression: 'attribute_exists(pk)',
       }),
     );

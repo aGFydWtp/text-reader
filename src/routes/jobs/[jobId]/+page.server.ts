@@ -49,17 +49,22 @@ export const actions: Actions = {
 
     const jobId = params.jobId;
     const formData = await request.formData();
-    const keys = formData.getAll('dictKey').map((value) => String(value));
     const values = formData.getAll('dictValue').map((value) => String(value));
+    const entries = formData.getAll('dictKey').map((value, index) => ({
+      key: String(value).trim(),
+      value: (values[index] ?? '').trim(),
+    }));
 
-    const fileDict: Record<string, string> = {};
-    keys.forEach((key, index) => {
-      const normalizedKey = key.trim();
-      const normalizedValue = (values[index] ?? '').trim();
-      if (!normalizedKey && !normalizedValue) return;
-      if (!normalizedKey) return;
-      fileDict[normalizedKey] = normalizedValue;
-    });
+    const hasMissingAlias = entries.some(({ key, value }) => key && !value);
+    if (hasMissingAlias) {
+      return fail(400, { error: '読み替えを入力してください。' });
+    }
+
+    const fileDict = entries.reduce<Record<string, string>>((acc, { key, value }) => {
+      if (!key || !value) return acc;
+      acc[key] = value;
+      return acc;
+    }, {});
 
     const { error: updateError } = await updateJobDictionary({
       userSub: user.sub,
