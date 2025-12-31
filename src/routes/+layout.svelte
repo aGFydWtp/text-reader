@@ -12,7 +12,7 @@
 	<header class="app-header">
 		<div class="brand">Text Reader</div>
 		{#if data.user}
-			<a class="logout" href="/logout">Logout</a>
+			<a class="logout" href="/logout">ログアウト</a>
 		{/if}
 	</header>
 	<main class="app-main">
