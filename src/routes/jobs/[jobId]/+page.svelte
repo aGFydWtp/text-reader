@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from './$types';
+  import DictEditor from './DictEditor.svelte';
 
   let { data, form }: { data: PageData; form: any } = $props();
   let entries = $state<{ key: string; value: string }[]>([]);
@@ -7,18 +8,6 @@
   $effect(() => {
     entries = data.dictEntries.map((entry) => ({ ...entry }));
   });
-
-  function addRow() {
-    entries = [...entries, { key: '', value: '' }];
-  }
-
-  function removeRow(index: number) {
-    if (entries.length === 1) {
-      entries = [{ key: '', value: '' }];
-      return;
-    }
-    entries = entries.filter((_, idx) => idx !== index);
-  }
 
   function statusTone(status?: string) {
     switch (status) {
@@ -56,7 +45,7 @@
   {/if}
 
   <div class="card">
-    <h2>音声プレビュー</h2>
+    <h2>再生</h2>
     {#if data.audioUrl}
       <audio controls src={data.audioUrl} preload="none"></audio>
     {:else}
@@ -65,36 +54,7 @@
   </div>
 
   <form class="card" method="post" action="?/updateDict">
-    <div class="card-header">
-      <div>
-        <h2>読み上げ設定</h2>
-        <p class="muted">単語の読み替えを登録できます。</p>
-      </div>
-      <button class="ghost" type="button" onclick={addRow}>追加</button>
-    </div>
-
-    <div class="dict-list">
-      {#each entries as entry, index (index)}
-        <div class="dict-row">
-          <div class="dict-fields">
-            <input
-              class="input"
-              name="dictKey"
-              placeholder="元の単語"
-              bind:value={entry.key}
-            />
-            <input
-              class="input"
-              name="dictValue"
-              placeholder="読み替え"
-              bind:value={entry.value}
-            />
-          </div>
-          <button class="remove" type="button" onclick={() => removeRow(index)}>削除</button>
-        </div>
-      {/each}
-    </div>
-
+    <DictEditor bind:entries />
     <button class="primary" type="submit">設定を保存</button>
     {#if form?.error}
       <p class="notice error">{form.error}</p>
@@ -197,40 +157,6 @@
     width: 100%;
   }
 
-  .card-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .dict-list {
-    display: grid;
-    gap: 10px;
-  }
-
-  .dict-row {
-    display: grid;
-    gap: 8px;
-    border: 1px solid #efe7dd;
-    border-radius: 12px;
-    padding: 10px;
-    background: #fff;
-  }
-
-  .dict-fields {
-    display: grid;
-    gap: 8px;
-  }
-
-  .input {
-    border-radius: 12px;
-    border: 1px solid #ded6cc;
-    padding: 10px 12px;
-    font-size: 14px;
-    background: #fff;
-  }
-
   .primary {
     border: none;
     border-radius: 999px;
@@ -238,15 +164,6 @@
     background: #1d1d1d;
     color: #fff;
     font-weight: 600;
-  }
-
-  .ghost {
-    border: 1px solid #d8d0c6;
-    background: transparent;
-    border-radius: 999px;
-    padding: 6px 12px;
-    font-size: 12px;
-    color: #5b4b32;
   }
 
   .notice {
@@ -262,13 +179,4 @@
     color: #8a5a12;
   }
 
-  .remove {
-    border: none;
-    background: #f7efe6;
-    color: #5b4b32;
-    border-radius: 999px;
-    padding: 6px 12px;
-    font-size: 12px;
-    align-self: flex-start;
-  }
 </style>
