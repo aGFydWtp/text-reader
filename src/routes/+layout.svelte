@@ -1,5 +1,6 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
+	import '$lib/assets/reset.css';
 
 	let { children, data } = $props();
 </script>
@@ -22,18 +23,23 @@
 
 <style>
 	.app-shell {
-		min-height: 100vh;
+		min-height: 100dvh;
 		background: #f7f5f2;
 		color: #1d1d1d;
 	}
 
 	.app-header {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		padding: 16px 24px;
 		border-bottom: 1px solid #e5e0d9;
 		background: #fffdf8;
+		z-index: 10;
 	}
 
 	.brand {
@@ -49,7 +55,7 @@
 	}
 
 	.app-main {
-		padding: 24px;
+		padding-top: 60px;
 		max-width: 960px;
 		margin: 0 auto;
 	}
