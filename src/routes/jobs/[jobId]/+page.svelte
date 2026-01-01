@@ -72,7 +72,11 @@
   .page {
     display: grid;
     gap: 16px;
-    padding-bottom: 24px;
+    padding: 24px;
+    @media (width < 960px) {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
   }
 
   .hero {

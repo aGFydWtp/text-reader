@@ -39,6 +39,7 @@
   .page {
     display: grid;
     gap: 16px;
+    padding: 24px;
   }
 
   h1 {

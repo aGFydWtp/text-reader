@@ -8,7 +8,7 @@
 
 <style>
   .login {
-    min-height: calc(100vh - 72px);
+    min-height: calc(100dvh - 60px);
     display: grid;
     place-items: center;
   }

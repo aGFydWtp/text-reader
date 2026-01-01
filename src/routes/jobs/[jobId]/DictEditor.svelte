@@ -1,4 +1,7 @@
 <script lang="ts">
+    import ArrowIcon from "$lib/components/icons/ArrowIcon.svelte";
+    import DeleteIcon from "$lib/components/icons/DeleteIcon.svelte";
+
   type Entry = { key: string; value: string };
 
   let { entries = $bindable<Entry[]>([]) } = $props();
@@ -25,20 +28,26 @@
   {#each entries as entry, index (index)}
     <div class="dict-row">
       <div class="dict-fields">
-        <input
-          class="input"
-          name="dictKey"
-          placeholder="元の単語"
-          bind:value={entry.key}
-        />
-        →
-        <input
-          class="input"
-          name="dictValue"
-          placeholder="読み替え"
-          bind:value={entry.value}
-        />
-        <button class="remove" type="button" onclick={() => removeRow(index)}>削除</button>
+        <div class="items">
+          <input
+            class="input"
+            name="dictKey"
+            placeholder="元の単語"
+            bind:value={entry.key}
+          />
+          <span class="arrow">
+            <ArrowIcon size={20} />
+          </span>
+          <input
+            class="input"
+            name="dictValue"
+            placeholder="読み替え"
+            bind:value={entry.value}
+          />
+        </div>
+        <button class="remove" type="button" onclick={() => removeRow(index)}>
+          <DeleteIcon size={20} />
+        </button>
       </div>
     </div>
   {/each}
@@ -71,6 +80,26 @@
     gap: 8px;
   }
 
+  .items {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    @media (width < 600px) {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  .arrow {
+    width: 20px;
+    height: 20px;
+    @media (width < 600px) {
+      transform: rotate(90deg);
+    }
+  }
+
   .input {
     border-radius: 12px;
     border: 1px solid #ded6cc;
@@ -95,9 +124,9 @@
     background: #f7efe6;
     color: #5b4b32;
     border-radius: 999px;
-    padding: 6px 12px;
-    font-size: 12px;
-    text-wrap: nowrap;
+    padding: 6px;
+    min-width: 32px;
+    cursor: pointer;
   }
 
   .muted {
