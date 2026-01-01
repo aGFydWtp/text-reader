@@ -9,6 +9,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
+    "deploy:lambda-edge": "cdk deploy TextReaderLambdaEdgeStack",
     "deploy:ecr": "cdk deploy TextReaderEcrStack",
     "deploy:acm": "cdk deploy TextReaderCloudFrontAcmStack TextReaderCognitoAcmStack",
     "deploy:acm:cloudfront": "cdk deploy TextReaderCloudFrontAcmStack",

@@ -196,6 +196,17 @@ export class TextReaderStack extends cdk.Stack {
         cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        edgeLambdas: [
+          {
+            functionVersion: lambda.Version.fromVersionArn(
+              this,
+              "LambdaEdgeViewerRequest",
+              "arn:aws:lambda:us-east-1:487854277464:function:TextReaderLambdaEdgeStack-EdgeFunction71EFB7B6-WsgkpssM6Exg:1",
+            ),
+            eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
+            includeBody: true,
+          },
+        ],
       },
       additionalBehaviors: {
         'files/*': {

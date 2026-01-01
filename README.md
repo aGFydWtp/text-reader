@@ -96,7 +96,12 @@ CloudFront と Cognito のカスタムドメインは us-east-1 の ACM を使�
 pnpm -C cdk deploy:ecr
 ```
 
-2) ACM（CloudFront + Cognito）
+2) Lambda@Edge
+```sh
+pnpm -C cdk deploy:lambda-edge
+```
+
+3) ACM（CloudFront + Cognito）
 ```sh
 pnpm -C cdk deploy:acm \
   -c hostedZoneId=Z002217135CBSLLD4NG0R \
@@ -105,12 +110,12 @@ pnpm -C cdk deploy:acm \
   -c cognitoSubdomain=auth.text-reader
 ```
 
-3) Secrets（Google OAuth クライアントシークレット）
+4) Secrets（Google OAuth クライアントシークレット）
 ```sh
 GOOGLE_CLIENT_SECRET=your-secret pnpm -C cdk deploy:secrets
 ```
 
-4) App（ACM の ARN を指定）
+5) App（ACM の ARN を指定）
 ```sh
 GOOGLE_CLIENT_ID=your-client-id FRONTEND_IMAGE_TAG=2024-09-01 pnpm -C cdk deploy:app \
   -c hostedZoneId=Z002217135CBSLLD4NG0R \

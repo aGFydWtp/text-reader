@@ -4,6 +4,7 @@ import { TextReaderStack } from '../lib/cdk-stack';
 import { EcrStack } from '../lib/ecr-stack';
 import { TextReaderCloudFrontAcmStack, TextReaderCognitoAcmStack } from '../lib/acm-stack';
 import { TextReaderSecretsStack } from '../lib/secrets-stack';
+import { LambdaEdgeStack } from '../lib/lambda-edge-stack';
 
 const app = new cdk.App();
 const frontendImageTag = app.node.tryGetContext('frontendImageTag') ?? 'latest';
@@ -56,7 +57,13 @@ const cognitoCustomDomain =
       }
     : undefined;
 
-const ecrStack = new EcrStack(app, 'TextReaderEcrStack');
+  const ecrStack = new EcrStack(app, 'TextReaderEcrStack');
+  new LambdaEdgeStack(app, 'TextReaderLambdaEdgeStack', {
+    env: {
+      account: process.env.CDK_DEFAULT_ACCOUNT,
+      region: 'us-east-1',
+    },
+  });
 const secretsStack = new TextReaderSecretsStack(app, 'TextReaderSecretsStack');
 const appStack = new TextReaderStack(app, 'TextReaderStack', {
   frontendRepository: ecrStack.frontendRepository,
