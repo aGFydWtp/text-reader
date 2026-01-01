@@ -201,7 +201,7 @@ export class TextReaderStack extends cdk.Stack {
             functionVersion: lambda.Version.fromVersionArn(
               this,
               "LambdaEdgeViewerRequest",
-              "arn:aws:lambda:us-east-1:487854277464:function:TextReaderLambdaEdgeStack-EdgeFunction71EFB7B6-WsgkpssM6Exg:1",
+              "arn:aws:lambda:us-east-1:487854277464:function:TextReaderLambdaEdgeStack-EdgeFunction71EFB7B6-WsgkpssM6Exg:2",
             ),
             eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
             includeBody: true,
