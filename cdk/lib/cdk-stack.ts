@@ -211,6 +211,8 @@ export class TextReaderStack extends cdk.Stack {
             certificate,
           }
         : {}),
+      httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+      enableLogging: true,
     });
 
     // 将来的に FunctionUrlOrigin.withOriginAccessControl(functionUrl); で自動で付与される可能性もある。（lambda:InvokeFunctionUrl は自動で付与されているため）
@@ -357,6 +359,7 @@ export class TextReaderStack extends cdk.Stack {
     frontendFunction.addEnvironment('COGNITO_CLIENT_ID', userPoolClient.userPoolClientId);
     frontendFunction.addEnvironment('COGNITO_ISSUER', userPool.userPoolProviderUrl);
     frontendFunction.addEnvironment('PUBLIC_APP_ORIGIN', publicAppOrigin);
+    frontendFunction.addEnvironment('ORIGIN', publicAppOrigin);
     frontendFunction.addEnvironment('TTS_START_FUNCTION_NAME', ttsStartFunction.functionName);
 
     const userPoolCfn = userPool.node.defaultChild as cognito.CfnUserPool;
