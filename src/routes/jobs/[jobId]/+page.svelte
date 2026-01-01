@@ -5,11 +5,17 @@
   let { data, form }: { data: PageData; form: any } = $props();
   let entries = $state<{ key: string; value: string }[]>([]);
 
+  const formDataStarted = $derived<boolean>(Boolean(form?.started) ?? false);
+
   $effect(() => {
     entries = data.dictEntries.map((entry) => ({ ...entry }));
   });
 
-  function statusTone(status?: string) {
+  function statusTone({status, formDataStarted}:{status?: string, formDataStarted: boolean}) {
+    if (formDataStarted) {
+      return 'progress';
+    }
+
     switch (status) {
       case 'COMPLETED':
         return 'done';
@@ -29,8 +35,8 @@
       <a class="back" href="/">一覧へ戻る</a>
       <h1>{data.job.filename ?? data.job.id}</h1>
       <div class="meta">
-        <span class={`pill ${statusTone(data.job.status)}`}>
-          {data.job.status ?? 'UNKNOWN'}
+        <span class={`pill ${statusTone({status:data.job.status, formDataStarted})}`}>
+          {formDataStarted ? 'TTS_STARTED' : data.job.status ?? 'UNKNOWN'}
         </span>
         <span class="time">{data.job.updatedAt ?? '-'}</span>
       </div>
