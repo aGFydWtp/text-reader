@@ -41,7 +41,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 };
 
 export const actions: Actions = {
-  updateDict: async ({ request, locals, params }) => {
+  default: async ({ request, locals, params }) => {
     const user = locals.user;
     if (!user) {
       return fail(401, { error: 'Unauthorized' });
