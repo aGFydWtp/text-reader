@@ -1,5 +1,5 @@
 import { error, fail } from "@sveltejs/kit";
-import { getJobForUser, updateJobDictionary } from "$lib/server/aws/dynamo";
+import { getJobForUser, updateJobDictionary, updateJobFilename } from "$lib/server/aws/dynamo";
 import { invokeTtsStart } from "$lib/server/aws/lambda";
 import { createDownloadUrl } from "$lib/server/aws/s3";
 import type { Actions, PageServerLoad } from "./$types";
@@ -47,10 +47,36 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 };
 
 export const actions: Actions = {
-  update: async ({ request, locals, params }) => {
+  updateFilename: async ({ request, locals, params }) => {
     const user = locals.user;
     if (!user) {
-      return fail(401, { error: "Unauthorized" });
+      return fail(401, { action: "updateFilename", error: "Unauthorized" });
+    }
+
+    const jobId = params.jobId;
+    const formData = await request.formData();
+    const filename = String(formData.get("filename") ?? "").trim();
+
+    if (!filename) {
+      return fail(400, { action: "updateFilename", error: "ファイル名を入力してください。" });
+    }
+
+    const { error: updateError } = await updateJobFilename({
+      userSub: user.sub,
+      jobId,
+      filename,
+    });
+
+    if (updateError) {
+      return fail(500, { action: "updateFilename", error: updateError });
+    }
+
+    return { action: "updateFilename", success: true };
+  },
+  updateSetting: async ({ request, locals, params }) => {
+    const user = locals.user;
+    if (!user) {
+      return fail(401, { action: "updateSetting", error: "Unauthorized" });
     }
 
     const jobId = params.jobId;
@@ -74,14 +100,14 @@ export const actions: Actions = {
     });
 
     if (updateError) {
-      return fail(500, { error: updateError });
+      return fail(500, { action: "updateSetting", error: updateError });
     }
 
     const { error: invokeError } = await invokeTtsStart(jobId);
     if (invokeError) {
-      return { success: true, warning: invokeError };
+      return { action: "updateSetting", success: true, warning: invokeError };
     }
 
-    return { success: true, started: true };
+    return { action: "updateSetting", success: true, started: true };
   },
 };

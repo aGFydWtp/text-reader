@@ -162,3 +162,35 @@ export async function updateJobDictionary(payload: {
     };
   }
 }
+
+export async function updateJobFilename(payload: {
+  userSub: string;
+  jobId: string;
+  filename: string;
+}): Promise<{ error?: string }> {
+  try {
+    if (!env.JOBS_TABLE_NAME) {
+      return { error: 'JOBS_TABLE_NAME is not set' };
+    }
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: env.JOBS_TABLE_NAME,
+        Key: {
+          pk: `USER#${payload.userSub}`,
+          sk: `JOB#${payload.jobId}`,
+        },
+        UpdateExpression: 'SET filename = :filename, updatedAt = :updatedAt',
+        ExpressionAttributeValues: {
+          ':filename': payload.filename,
+          ':updatedAt': new Date().toISOString(),
+        },
+        ConditionExpression: 'attribute_exists(pk)',
+      }),
+    );
+
+    return {};
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Failed to update filename' };
+  }
+}
