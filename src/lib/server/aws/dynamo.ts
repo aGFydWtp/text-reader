@@ -1,4 +1,3 @@
-import { env } from "$env/dynamic/private";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
@@ -6,6 +5,7 @@ import {
   QueryCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { env } from "$env/dynamic/private";
 
 export type JobItem = {
   pk: string;
@@ -170,7 +170,7 @@ export async function updateJobFilename(payload: {
 }): Promise<{ error?: string }> {
   try {
     if (!env.JOBS_TABLE_NAME) {
-      return { error: 'JOBS_TABLE_NAME is not set' };
+      return { error: "JOBS_TABLE_NAME is not set" };
     }
 
     await docClient.send(
@@ -180,17 +180,17 @@ export async function updateJobFilename(payload: {
           pk: `USER#${payload.userSub}`,
           sk: `JOB#${payload.jobId}`,
         },
-        UpdateExpression: 'SET filename = :filename, updatedAt = :updatedAt',
+        UpdateExpression: "SET filename = :filename, updatedAt = :updatedAt",
         ExpressionAttributeValues: {
-          ':filename': payload.filename,
-          ':updatedAt': new Date().toISOString(),
+          ":filename": payload.filename,
+          ":updatedAt": new Date().toISOString(),
         },
-        ConditionExpression: 'attribute_exists(pk)',
+        ConditionExpression: "attribute_exists(pk)",
       }),
     );
 
     return {};
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Failed to update filename' };
+    return { error: error instanceof Error ? error.message : "Failed to update filename" };
   }
 }
