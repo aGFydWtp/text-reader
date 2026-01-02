@@ -1,4 +1,5 @@
 <script lang="ts">
+import { formatJst } from "$lib/utils/date";
 import type { PageData } from "./$types";
 import DictEditor from "./DictEditor.svelte";
 
@@ -38,7 +39,7 @@ function statusTone({ status, formDataStarted }: { status?: string; formDataStar
         <span class={`pill ${statusTone({status:data.job.status, formDataStarted})}`}>
           {formDataStarted ? 'TTS_STARTED' : data.job.status ?? 'UNKNOWN'}
         </span>
-        <span class="time">{data.job.updatedAt ?? '-'}</span>
+        <span class="time">{formatJst(data.job.updatedAt)}</span>
       </div>
     </div>
   </header>
