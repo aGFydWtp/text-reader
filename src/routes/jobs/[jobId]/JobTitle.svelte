@@ -31,7 +31,7 @@ async function saveFilename() {
   const formData = new FormData();
   formData.set("filename", trimmed);
 
-  const response = await fetch("?/updateFilename", {
+  const response = await fetch("?%2FupdateFilename", {
     method: "POST",
     headers: {
       accept: "application/json",
