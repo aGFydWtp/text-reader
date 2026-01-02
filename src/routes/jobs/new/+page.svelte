@@ -127,11 +127,9 @@ const handleEnhance = (form: HTMLFormElement) =>
 
 <section class="page">
   <div class="header">
-    <div>
+      <a class="back" href="/">一覧へ戻る</a>
       <h1>ファイル登録</h1>
       <p>音声化したいテキストファイルを登録します。</p>
-    </div>
-    <a class="back" href="/">一覧へ戻る</a>
   </div>
 
   <form class="form" method="post" enctype="multipart/form-data" use:handleEnhance>
@@ -210,9 +208,9 @@ const handleEnhance = (form: HTMLFormElement) =>
 
   .header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   h1 {
