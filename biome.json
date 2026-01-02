@@ -1,0 +1,49 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "files": {
+    "includes": [
+      "src/**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,scss,html,md,svelte}",
+      "scripts/**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,scss,html,md}",
+      "cdk/**/*.{ts,tsx,js,jsx,mjs,cjs,json,css,scss,html,md}"
+    ],
+    "ignoreUnknown": true
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "recommended": true
+      }
+    }
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "nursery": {
+        "recommended": true
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.svelte"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useConst": "off",
+            "useImportType": "off"
+          },
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
+          }
+        }
+      }
+    }
+  ]
+}

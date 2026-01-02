@@ -1,128 +1,125 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+import { enhance } from "$app/forms";
 
-  type InputMode = 'file' | 'clipboard';
+type InputMode = "file" | "clipboard";
 
-  let file = $state<File | null>(null);
-  let fileInput = $state<HTMLInputElement | null>(null);
-  let inputMode = $state<InputMode>('file');
-  let clipboardText = $state('');
-  let clipboardFilename = $state('');
-  const charCount = $derived(clipboardText.length);
-  let status = $state<'idle' | 'registering' | 'uploading' | 'done' | 'error'>('idle');
-  let message = $state('');
+let file = $state<File | null>(null);
+let fileInput = $state<HTMLInputElement | null>(null);
+let inputMode = $state<InputMode>("file");
+let clipboardText = $state("");
+let clipboardFilename = $state("");
+const charCount = $derived(clipboardText.length);
+let status = $state<"idle" | "registering" | "uploading" | "done" | "error">("idle");
+let message = $state("");
 
-  function onFileChange(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    file = input.files?.[0] ?? null;
-    message = '';
-    if (!file) {
-      status = 'idle';
+function onFileChange(event: Event) {
+  const input = event.currentTarget as HTMLInputElement;
+  file = input.files?.[0] ?? null;
+  message = "";
+  if (!file) {
+    status = "idle";
+  }
+}
+
+function onModeChange(mode: InputMode) {
+  inputMode = mode;
+  message = "";
+  status = "idle";
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    clipboardText = text;
+    message = "";
+    if (!clipboardFilename) {
+      clipboardFilename = `clipboard-${Date.now()}.txt`;
     }
+  } catch {
+    status = "error";
+    message = "クリップボードの読み取りに失敗しました。";
   }
+}
 
-  function onModeChange(mode: InputMode) {
-    inputMode = mode;
-    message = '';
-    status = 'idle';
+function resetInputs() {
+  file = null;
+  clipboardText = "";
+  clipboardFilename = "";
+  if (fileInput) {
+    fileInput.value = "";
   }
+}
 
-  async function pasteFromClipboard() {
-    try {
-      const text = await navigator.clipboard.readText();
-      clipboardText = text;
-      message = '';
-      if (!clipboardFilename) {
-        clipboardFilename = `clipboard-${Date.now()}.txt`;
-      }
-    } catch {
-      status = 'error';
-      message = 'クリップボードの読み取りに失敗しました。';
-    }
-  }
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
 
-  function resetInputs() {
-    file = null;
-    clipboardText = '';
-    clipboardFilename = '';
-    if (fileInput) {
-      fileInput.value = '';
-    }
-  }
-
-  function asString(value: unknown): string | undefined {
-    return typeof value === 'string' ? value : undefined;
-  }
-
-  const handleEnhance = (form: HTMLFormElement) =>
-    enhance(form, ({ formData, cancel }) => {
-    if (inputMode === 'file') {
+const handleEnhance = (form: HTMLFormElement) =>
+  enhance(form, ({ formData, cancel }) => {
+    if (inputMode === "file") {
       if (!file) {
         cancel();
-        status = 'error';
-        message = 'ファイルを選択してください。';
+        status = "error";
+        message = "ファイルを選択してください。";
         return;
       }
-      formData.set('filename', file.name);
-      formData.set('contentType', file.type || 'text/plain');
+      formData.set("filename", file.name);
+      formData.set("contentType", file.type || "text/plain");
     } else {
       if (!clipboardText) {
         cancel();
-        status = 'error';
-        message = 'クリップボードのテキストを取得してください。';
+        status = "error";
+        message = "クリップボードのテキストを取得してください。";
         return;
       }
       if (!clipboardFilename) {
         cancel();
-        status = 'error';
-        message = 'ファイル名を入力してください。';
+        status = "error";
+        message = "ファイル名を入力してください。";
         return;
       }
-      formData.set('filename', clipboardFilename);
-      formData.set('contentType', 'text/plain');
+      formData.set("filename", clipboardFilename);
+      formData.set("contentType", "text/plain");
     }
-    status = 'registering';
+    status = "registering";
 
     return async ({ result }) => {
-      if (result.type !== 'success') {
-        status = 'error';
+      if (result.type !== "success") {
+        status = "error";
         const errorFromAction =
-          result.type === 'failure' ? asString((result.data as any)?.error) : undefined;
-        message = errorFromAction ?? '登録に失敗しました。';
+          result.type === "failure" ? asString((result.data as any)?.error) : undefined;
+        message = errorFromAction ?? "登録に失敗しました。";
         return;
       }
 
       const uploadUrl = asString((result.data as any)?.uploadUrl);
       if (!uploadUrl) {
-        status = 'error';
-        message = 'アップロードURLの取得に失敗しました。';
+        status = "error";
+        message = "アップロードURLの取得に失敗しました。";
         return;
       }
 
-      status = 'uploading';
-      message = 'アップロード中...';
+      status = "uploading";
+      message = "アップロード中...";
 
-      const body =
-        inputMode === 'file'
-          ? file
-          : new Blob([clipboardText], { type: 'text/plain' });
+      const body = inputMode === "file" ? file : new Blob([clipboardText], { type: "text/plain" });
 
       const response = await fetch(uploadUrl, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'content-type': inputMode === 'file' ? file?.type || 'text/plain' : 'text/plain',
+          "content-type": inputMode === "file" ? file?.type || "text/plain" : "text/plain",
         },
         body,
       });
 
       if (!response.ok) {
-        status = 'error';
+        status = "error";
         message = `アップロードに失敗しました (${response.status})`;
         return;
       }
 
-      status = 'done';
-      message = 'アップロードが完了しました。処理の反映まで少しお待ちください。';
+      status = "done";
+      message = "アップロードが完了しました。処理の反映まで少しお待ちください。";
       resetInputs();
     };
   });

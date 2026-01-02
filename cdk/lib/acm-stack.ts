@@ -1,7 +1,7 @@
-import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
-import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as cdk from "aws-cdk-lib";
+import * as certificatemanager from "aws-cdk-lib/aws-certificatemanager";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import type { Construct } from "constructs";
 
 interface TextReaderAcmStackProps extends cdk.StackProps {
   hostedZoneId: string;
@@ -30,20 +30,20 @@ export class TextReaderCloudFrontAcmStack extends cdk.Stack {
     const { hostedZoneId, hostedZoneName, subdomain } = props;
     const domainName = `${subdomain}.${hostedZoneName}`;
 
-    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, "HostedZone", {
       hostedZoneId,
       zoneName: hostedZoneName,
     });
 
-    const certificate = createCertificate(this, 'CloudFrontCert', domainName, hostedZone);
+    const certificate = createCertificate(this, "CloudFrontCert", domainName, hostedZone);
 
     this.certificateArn = certificate.certificateArn;
     this.domainName = domainName;
 
-    new cdk.CfnOutput(this, 'CloudFrontCertificateArn', {
+    new cdk.CfnOutput(this, "CloudFrontCertificateArn", {
       value: this.certificateArn,
     });
-    new cdk.CfnOutput(this, 'CloudFrontCustomDomainName', {
+    new cdk.CfnOutput(this, "CloudFrontCustomDomainName", {
       value: this.domainName,
     });
   }
@@ -59,20 +59,20 @@ export class TextReaderCognitoAcmStack extends cdk.Stack {
     const { hostedZoneId, hostedZoneName, subdomain } = props;
     const domainName = `${subdomain}.${hostedZoneName}`;
 
-    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, "HostedZone", {
       hostedZoneId,
       zoneName: hostedZoneName,
     });
 
-    const certificate = createCertificate(this, 'CognitoCert', domainName, hostedZone);
+    const certificate = createCertificate(this, "CognitoCert", domainName, hostedZone);
 
     this.certificateArn = certificate.certificateArn;
     this.domainName = domainName;
 
-    new cdk.CfnOutput(this, 'CognitoCertificateArn', {
+    new cdk.CfnOutput(this, "CognitoCertificateArn", {
       value: this.certificateArn,
     });
-    new cdk.CfnOutput(this, 'CognitoCustomDomainName', {
+    new cdk.CfnOutput(this, "CognitoCustomDomainName", {
       value: this.domainName,
     });
   }

@@ -1,40 +1,40 @@
 #!/usr/bin/env node
-import * as cdk from 'aws-cdk-lib';
-import { TextReaderStack } from '../lib/cdk-stack';
-import { EcrStack } from '../lib/ecr-stack';
-import { TextReaderCloudFrontAcmStack, TextReaderCognitoAcmStack } from '../lib/acm-stack';
-import { TextReaderSecretsStack } from '../lib/secrets-stack';
-import { LambdaEdgeStack } from '../lib/lambda-edge-stack';
+import * as cdk from "aws-cdk-lib";
+import { TextReaderStack } from "../lib/cdk-stack";
+import { EcrStack } from "../lib/ecr-stack";
+import { TextReaderCloudFrontAcmStack, TextReaderCognitoAcmStack } from "../lib/acm-stack";
+import { TextReaderSecretsStack } from "../lib/secrets-stack";
+import { LambdaEdgeStack } from "../lib/lambda-edge-stack";
 
 const app = new cdk.App();
-const frontendImageTag = app.node.tryGetContext('frontendImageTag') ?? 'latest';
-const hostedZoneId = app.node.tryGetContext('hostedZoneId');
-const hostedZoneName = app.node.tryGetContext('hostedZoneName');
-const customSubdomain = app.node.tryGetContext('customSubdomain') ?? 'text-reader';
-const cognitoSubdomain = app.node.tryGetContext('cognitoSubdomain') ?? `auth.${customSubdomain}`;
-const certificateArn = app.node.tryGetContext('certificateArn');
-const cognitoDomainName = app.node.tryGetContext('cognitoDomainName');
-const cognitoCertificateArn = app.node.tryGetContext('cognitoCertificateArn');
-const lambdaEdgeArn = app.node.tryGetContext('lambdaEdgeArn');
+const frontendImageTag = app.node.tryGetContext("frontendImageTag") ?? "latest";
+const hostedZoneId = app.node.tryGetContext("hostedZoneId");
+const hostedZoneName = app.node.tryGetContext("hostedZoneName");
+const customSubdomain = app.node.tryGetContext("customSubdomain") ?? "text-reader";
+const cognitoSubdomain = app.node.tryGetContext("cognitoSubdomain") ?? `auth.${customSubdomain}`;
+const certificateArn = app.node.tryGetContext("certificateArn");
+const cognitoDomainName = app.node.tryGetContext("cognitoDomainName");
+const cognitoCertificateArn = app.node.tryGetContext("cognitoCertificateArn");
+const lambdaEdgeArn = app.node.tryGetContext("lambdaEdgeArn");
 
 if (hostedZoneId && hostedZoneName) {
-  new TextReaderCloudFrontAcmStack(app, 'TextReaderCloudFrontAcmStack', {
+  new TextReaderCloudFrontAcmStack(app, "TextReaderCloudFrontAcmStack", {
     hostedZoneId,
     hostedZoneName,
     subdomain: customSubdomain,
     env: {
       account: process.env.CDK_DEFAULT_ACCOUNT,
-      region: 'us-east-1',
+      region: "us-east-1",
     },
   });
 
-  new TextReaderCognitoAcmStack(app, 'TextReaderCognitoAcmStack', {
+  new TextReaderCognitoAcmStack(app, "TextReaderCognitoAcmStack", {
     hostedZoneId,
     hostedZoneName,
     subdomain: cognitoSubdomain,
     env: {
       account: process.env.CDK_DEFAULT_ACCOUNT,
-      region: 'us-east-1',
+      region: "us-east-1",
     },
   });
 }
@@ -58,15 +58,15 @@ const cognitoCustomDomain =
       }
     : undefined;
 
-  const ecrStack = new EcrStack(app, 'TextReaderEcrStack');
-  new LambdaEdgeStack(app, 'TextReaderLambdaEdgeStack', {
-    env: {
-      account: process.env.CDK_DEFAULT_ACCOUNT,
-      region: 'us-east-1',
-    },
-  });
-const secretsStack = new TextReaderSecretsStack(app, 'TextReaderSecretsStack');
-const appStack = new TextReaderStack(app, 'TextReaderStack', {
+const ecrStack = new EcrStack(app, "TextReaderEcrStack");
+new LambdaEdgeStack(app, "TextReaderLambdaEdgeStack", {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: "us-east-1",
+  },
+});
+const secretsStack = new TextReaderSecretsStack(app, "TextReaderSecretsStack");
+const appStack = new TextReaderStack(app, "TextReaderStack", {
   frontendRepository: ecrStack.frontendRepository,
   frontendImageTag,
   customDomain,
@@ -88,7 +88,7 @@ const appStack = new TextReaderStack(app, 'TextReaderStack', {
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 });
 
-cdk.Tags.of(ecrStack).add('Component', 'ecr');
-cdk.Tags.of(secretsStack).add('Component', 'secrets');
+cdk.Tags.of(ecrStack).add("Component", "ecr");
+cdk.Tags.of(secretsStack).add("Component", "secrets");
 appStack.addDependency(ecrStack);
 appStack.addDependency(secretsStack);

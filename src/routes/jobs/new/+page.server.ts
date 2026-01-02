@@ -1,32 +1,32 @@
-import type { Actions, PageServerLoad } from './$types';
-import { fail } from '@sveltejs/kit';
-import { randomUUID } from 'crypto';
-import { createJob } from '$lib/server/aws/dynamo';
-import { createUploadUrl } from '$lib/server/aws/s3';
+import { fail } from "@sveltejs/kit";
+import { randomUUID } from "crypto";
+import { createJob } from "$lib/server/aws/dynamo";
+import { createUploadUrl } from "$lib/server/aws/s3";
+import type { Actions, PageServerLoad } from "./$types";
 
-const statusIssued = 'PRESIGNED_ISSUED';
+const statusIssued = "PRESIGNED_ISSUED";
 
 function sanitizeFilename(name: string): string {
-  return name.replace(/[\\/]/g, '_');
+  return name.replace(/[\\/]/g, "_");
 }
 
 export const load: PageServerLoad = async () => {
-  return { status: 'idle' };
+  return { status: "idle" };
 };
 
 export const actions: Actions = {
   default: async ({ request, locals }) => {
     const user = locals.user;
     if (!user) {
-      return fail(401, { error: 'Not authenticated' });
+      return fail(401, { error: "Not authenticated" });
     }
 
     const data = await request.formData();
-    const filename = data.get('filename');
-    const contentType = data.get('contentType');
+    const filename = data.get("filename");
+    const contentType = data.get("contentType");
 
-    if (!filename || typeof filename !== 'string') {
-      return fail(400, { error: 'Filename is required' });
+    if (!filename || typeof filename !== "string") {
+      return fail(400, { error: "Filename is required" });
     }
 
     const safeFilename = sanitizeFilename(filename);
@@ -36,13 +36,14 @@ export const actions: Actions = {
 
     const { url, error: urlError } = await createUploadUrl({
       key: uploadKey,
-      contentType: typeof contentType === 'string' && contentType.length > 0
-        ? contentType
-        : 'application/octet-stream',
+      contentType:
+        typeof contentType === "string" && contentType.length > 0
+          ? contentType
+          : "application/octet-stream",
     });
 
     if (!url) {
-      return fail(500, { error: urlError ?? 'Failed to create upload URL' });
+      return fail(500, { error: urlError ?? "Failed to create upload URL" });
     }
 
     const { error: jobError } = await createJob({

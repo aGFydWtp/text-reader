@@ -1,8 +1,8 @@
-import type { RequestHandler } from './$types';
-import { redirect } from '@sveltejs/kit';
-import { buildAuthorizeUrl } from '$lib/server/auth/oidc';
-import { generateCodeChallenge, generateCodeVerifier, generateState } from '$lib/server/auth/pkce';
-import { setPkceCookies } from '$lib/server/auth/cookies';
+import { redirect } from "@sveltejs/kit";
+import { setPkceCookies } from "$lib/server/auth/cookies";
+import { buildAuthorizeUrl } from "$lib/server/auth/oidc";
+import { generateCodeChallenge, generateCodeVerifier, generateState } from "$lib/server/auth/pkce";
+import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ cookies }) => {
   const verifier = generateCodeVerifier();

@@ -1,6 +1,11 @@
-import { env } from '$env/dynamic/private';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { env } from "$env/dynamic/private";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  PutCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 export type JobItem = {
   pk: string;
@@ -25,25 +30,25 @@ export async function listJobsForUser(userSub: string): Promise<{
 }> {
   try {
     if (!env.JOBS_TABLE_NAME) {
-      return { items: [], error: 'JOBS_TABLE_NAME is not set' };
+      return { items: [], error: "JOBS_TABLE_NAME is not set" };
     }
 
     const pk = `USER#${userSub}`;
     const response = await docClient.send(
       new QueryCommand({
         TableName: env.JOBS_TABLE_NAME,
-        KeyConditionExpression: 'pk = :pk and begins_with(sk, :skPrefix)',
+        KeyConditionExpression: "pk = :pk and begins_with(sk, :skPrefix)",
         ExpressionAttributeValues: {
-          ':pk': pk,
-          ':skPrefix': 'JOB#',
+          ":pk": pk,
+          ":skPrefix": "JOB#",
         },
       }),
     );
 
     const items = (response.Items ?? []) as JobItem[];
     const sorted = items.sort((a, b) => {
-      const aTime = a.updatedAt ?? '';
-      const bTime = b.updatedAt ?? '';
+      const aTime = a.updatedAt ?? "";
+      const bTime = b.updatedAt ?? "";
       return String(bTime).localeCompare(String(aTime));
     });
 
@@ -51,7 +56,7 @@ export async function listJobsForUser(userSub: string): Promise<{
   } catch (error) {
     return {
       items: [],
-      error: error instanceof Error ? error.message : 'Failed to load jobs',
+      error: error instanceof Error ? error.message : "Failed to load jobs",
     };
   }
 }
@@ -67,7 +72,7 @@ export async function createJob(payload: {
 }): Promise<{ error?: string }> {
   try {
     if (!env.JOBS_TABLE_NAME) {
-      return { error: 'JOBS_TABLE_NAME is not set' };
+      return { error: "JOBS_TABLE_NAME is not set" };
     }
 
     await docClient.send(
@@ -89,7 +94,7 @@ export async function createJob(payload: {
     return {};
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to create job',
+      error: error instanceof Error ? error.message : "Failed to create job",
     };
   }
 }
@@ -100,16 +105,16 @@ export async function getJobForUser(payload: {
 }): Promise<{ job?: JobItem; error?: string }> {
   try {
     if (!env.JOBS_TABLE_NAME) {
-      return { error: 'JOBS_TABLE_NAME is not set' };
+      return { error: "JOBS_TABLE_NAME is not set" };
     }
 
     const response = await docClient.send(
       new QueryCommand({
         TableName: env.JOBS_TABLE_NAME,
-        KeyConditionExpression: 'pk = :pk and sk = :sk',
+        KeyConditionExpression: "pk = :pk and sk = :sk",
         ExpressionAttributeValues: {
-          ':pk': `USER#${payload.userSub}`,
-          ':sk': `JOB#${payload.jobId}`,
+          ":pk": `USER#${payload.userSub}`,
+          ":sk": `JOB#${payload.jobId}`,
         },
         Limit: 1,
       }),
@@ -118,7 +123,9 @@ export async function getJobForUser(payload: {
     const job = (response.Items ?? [])[0] as JobItem | undefined;
     return { job };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Failed to load job' };
+    return {
+      error: error instanceof Error ? error.message : "Failed to load job",
+    };
   }
 }
 
@@ -129,7 +136,7 @@ export async function updateJobDictionary(payload: {
 }): Promise<{ error?: string }> {
   try {
     if (!env.JOBS_TABLE_NAME) {
-      return { error: 'JOBS_TABLE_NAME is not set' };
+      return { error: "JOBS_TABLE_NAME is not set" };
     }
 
     await docClient.send(
@@ -139,17 +146,19 @@ export async function updateJobDictionary(payload: {
           pk: `USER#${payload.userSub}`,
           sk: `JOB#${payload.jobId}`,
         },
-        UpdateExpression: 'SET fileDict = :fileDict, updatedAt = :updatedAt',
+        UpdateExpression: "SET fileDict = :fileDict, updatedAt = :updatedAt",
         ExpressionAttributeValues: {
-          ':fileDict': payload.fileDict,
-          ':updatedAt': new Date().toISOString(),
+          ":fileDict": payload.fileDict,
+          ":updatedAt": new Date().toISOString(),
         },
-        ConditionExpression: 'attribute_exists(pk)',
+        ConditionExpression: "attribute_exists(pk)",
       }),
     );
 
     return {};
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Failed to update dictionary' };
+    return {
+      error: error instanceof Error ? error.message : "Failed to update dictionary",
+    };
   }
 }

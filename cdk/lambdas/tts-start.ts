@@ -1,9 +1,9 @@
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { PollyClient, StartSpeechSynthesisTaskCommand, VoiceId } from '@aws-sdk/client-polly';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import type { S3Event } from 'aws-lambda';
-import type { Readable } from 'node:stream';
+import type { Readable } from "node:stream";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { PollyClient, StartSpeechSynthesisTaskCommand, type VoiceId } from "@aws-sdk/client-polly";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DynamoDBDocumentClient, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import type { S3Event } from "aws-lambda";
 
 const s3 = new S3Client({});
 const polly = new PollyClient({});
@@ -13,10 +13,10 @@ const {
   FILES_BUCKET_NAME,
   JOBS_TABLE_NAME,
   SNS_TOPIC_ARN,
-  UPLOAD_PREFIX = 'files/uploaded/',
-  OUTPUT_PREFIX = 'files/audio/',
-  POLLY_VOICE_ID = 'Takumi',
-  POLLY_ENGINE = 'standard',
+  UPLOAD_PREFIX = "files/uploaded/",
+  OUTPUT_PREFIX = "files/audio/",
+  POLLY_VOICE_ID = "Takumi",
+  POLLY_ENGINE = "standard",
 } = process.env;
 
 /**
@@ -24,15 +24,15 @@ const {
  */
 const ensureRequiredEnv = () => {
   const missing = [
-    ['FILES_BUCKET_NAME', FILES_BUCKET_NAME],
-    ['JOBS_TABLE_NAME', JOBS_TABLE_NAME],
-    ['SNS_TOPIC_ARN', SNS_TOPIC_ARN],
+    ["FILES_BUCKET_NAME", FILES_BUCKET_NAME],
+    ["JOBS_TABLE_NAME", JOBS_TABLE_NAME],
+    ["SNS_TOPIC_ARN", SNS_TOPIC_ARN],
   ]
     .filter(([, value]) => !value)
     .map(([name]) => name);
 
   if (missing.length > 0) {
-    throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+    throw new Error(`Missing required env vars: ${missing.join(", ")}`);
   }
 };
 
@@ -44,9 +44,9 @@ const ensureRequiredEnv = () => {
 const streamToString = async (stream: Readable): Promise<string> => {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   }
-  return Buffer.concat(chunks).toString('utf-8');
+  return Buffer.concat(chunks).toString("utf-8");
 };
 
 /**
@@ -56,11 +56,11 @@ const streamToString = async (stream: Readable): Promise<string> => {
  */
 const escapeXml = (value: string): string =>
   value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 
 /**
  * 置換辞書を SSML の `<sub>` タグとして適用し、エスケープ済みテキストを返す。
@@ -88,7 +88,7 @@ const applyDictionary = (text: string, dict: Record<string, string>): string => 
  * @param prefix S3 キープレフィックス
  * @returns スラッシュ付きプレフィックス
  */
-const normalizePrefix = (prefix: string): string => (prefix.endsWith('/') ? prefix : `${prefix}/`);
+const normalizePrefix = (prefix: string): string => (prefix.endsWith("/") ? prefix : `${prefix}/`);
 
 type JobRecord = {
   pk: string;
@@ -107,10 +107,10 @@ const loadJobById = async (jobId: string): Promise<JobRecord | null> => {
   const jobResult = await dynamo.send(
     new QueryCommand({
       TableName: JOBS_TABLE_NAME,
-      IndexName: 'GSI_JobId',
-      KeyConditionExpression: 'id = :id',
+      IndexName: "GSI_JobId",
+      KeyConditionExpression: "id = :id",
       ExpressionAttributeValues: {
-        ':id': jobId,
+        ":id": jobId,
       },
       Limit: 2,
     }),
@@ -158,14 +158,15 @@ const markFailed = async (job: JobRecord, message: string) => {
     new UpdateCommand({
       TableName: JOBS_TABLE_NAME,
       Key: { pk: job.pk, sk: job.sk },
-      UpdateExpression: 'SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt',
-      ExpressionAttributeNames: { '#status': 'status' },
+      UpdateExpression:
+        "SET #status = :status, errorMessage = :errorMessage, updatedAt = :updatedAt",
+      ExpressionAttributeNames: { "#status": "status" },
       ExpressionAttributeValues: {
-        ':status': 'FAILED',
-        ':errorMessage': message,
-        ':updatedAt': Date.now(),
+        ":status": "FAILED",
+        ":errorMessage": message,
+        ":updatedAt": Date.now(),
       },
-      ConditionExpression: 'attribute_exists(pk)',
+      ConditionExpression: "attribute_exists(pk)",
     }),
   );
 };
@@ -183,7 +184,7 @@ const processJob = async (payload: { jobId: string; objectKey?: string; bucketNa
 
   const objectKey = payload.objectKey ?? job.uploadKey;
   if (!objectKey) {
-    await markFailed(job, 'uploadKey is missing for this job');
+    await markFailed(job, "uploadKey is missing for this job");
     return;
   }
 
@@ -215,13 +216,13 @@ const processJob = async (payload: { jobId: string; objectKey?: string; bucketNa
   try {
     const startTask = await polly.send(
       new StartSpeechSynthesisTaskCommand({
-        OutputFormat: 'mp3',
+        OutputFormat: "mp3",
         OutputS3BucketName: FILES_BUCKET_NAME,
         OutputS3KeyPrefix: outputKeyPrefix,
         Text: ssml,
-        TextType: 'ssml',
+        TextType: "ssml",
         VoiceId: voiceId,
-        Engine: POLLY_ENGINE === 'neural' ? 'neural' : 'standard',
+        Engine: POLLY_ENGINE === "neural" ? "neural" : "standard",
         SnsTopicArn: SNS_TOPIC_ARN,
       }),
     );
@@ -232,9 +233,13 @@ const processJob = async (payload: { jobId: string; objectKey?: string; bucketNa
     }
   } catch (err) {
     const e = err as { name?: string; message?: string };
-    const name = e?.name ?? 'UnknownError';
+    const name = e?.name ?? "UnknownError";
     const message = e?.message ?? String(err);
-    console.error('Polly StartSpeechSynthesisTask failed', { jobId: payload.jobId, name, message });
+    console.error("Polly StartSpeechSynthesisTask failed", {
+      jobId: payload.jobId,
+      name,
+      message,
+    });
 
     await markFailed(job, `${name}: ${message}`);
     return;
@@ -245,16 +250,16 @@ const processJob = async (payload: { jobId: string; objectKey?: string; bucketNa
       TableName: JOBS_TABLE_NAME,
       Key: { pk: job.pk, sk: job.sk },
       UpdateExpression:
-        'SET #status = :status, pollyTaskId = :pollyTaskId, outputEpochMillis = :outputEpochMillis, outputKeyPrefix = :outputKeyPrefix, updatedAt = :updatedAt',
-      ExpressionAttributeNames: { '#status': 'status' },
+        "SET #status = :status, pollyTaskId = :pollyTaskId, outputEpochMillis = :outputEpochMillis, outputKeyPrefix = :outputKeyPrefix, updatedAt = :updatedAt",
+      ExpressionAttributeNames: { "#status": "status" },
       ExpressionAttributeValues: {
-        ':status': 'TTS_STARTED',
-        ':pollyTaskId': taskId,
-        ':outputEpochMillis': epochMillis,
-        ':outputKeyPrefix': outputKeyPrefix,
-        ':updatedAt': epochMillis,
+        ":status": "TTS_STARTED",
+        ":pollyTaskId": taskId,
+        ":outputEpochMillis": epochMillis,
+        ":outputKeyPrefix": outputKeyPrefix,
+        ":updatedAt": epochMillis,
       },
-      ConditionExpression: 'attribute_exists(pk)',
+      ConditionExpression: "attribute_exists(pk)",
     }),
   );
 };
@@ -263,16 +268,14 @@ const processJob = async (payload: { jobId: string; objectKey?: string; bucketNa
  * S3 イベントまたは直接指定された jobId を受け取り、TTS を開始する Lambda ハンドラー。
  * @param event S3Event もしくは jobId を含むオブジェクト
  */
-export const handler = async (
-  event: S3Event | { jobId?: string },
-): Promise<void> => {
+export const handler = async (event: S3Event | { jobId?: string }): Promise<void> => {
   ensureRequiredEnv();
-  console.log('TTS start event received', JSON.stringify(event, null, 2));
+  console.log("TTS start event received", JSON.stringify(event, null, 2));
 
-  if (!('Records' in event)) {
+  if (!("Records" in event)) {
     const maybeJobId = (event as { jobId?: string }).jobId;
     if (!maybeJobId) {
-      console.warn('Invalid event payload for TTS start', { event });
+      console.warn("Invalid event payload for TTS start", { event });
       return;
     }
     await processJob({ jobId: maybeJobId });
@@ -281,7 +284,7 @@ export const handler = async (
 
   for (const record of event.Records ?? []) {
     const bucketName = record.s3.bucket.name;
-    const objectKey = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
+    const objectKey = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
     if (!objectKey.startsWith(UPLOAD_PREFIX)) {
       console.warn(`Skipping object outside upload prefix: ${objectKey}`);
@@ -289,8 +292,8 @@ export const handler = async (
     }
 
     const relativePath = objectKey.slice(UPLOAD_PREFIX.length);
-    const [jobId, ...fileParts] = relativePath.split('/');
-    const filename = fileParts.join('/');
+    const [jobId, ...fileParts] = relativePath.split("/");
+    const filename = fileParts.join("/");
 
     if (!jobId || !filename) {
       console.warn(`Skipping object with unexpected key format: ${objectKey}`);

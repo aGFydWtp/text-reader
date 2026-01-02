@@ -1,6 +1,6 @@
-import { env } from '$env/dynamic/private';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { env } from "$env/dynamic/private";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const client = new S3Client({ region: env.AWS_REGION });
 
@@ -10,7 +10,7 @@ export async function createUploadUrl(payload: {
   expiresInSeconds?: number;
 }): Promise<{ url?: string; error?: string }> {
   if (!env.FILES_BUCKET_NAME) {
-    return { error: 'FILES_BUCKET_NAME is not set' };
+    return { error: "FILES_BUCKET_NAME is not set" };
   }
 
   const command = new PutObjectCommand({
@@ -26,7 +26,7 @@ export async function createUploadUrl(payload: {
     return { url };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to create upload URL',
+      error: error instanceof Error ? error.message : "Failed to create upload URL",
     };
   }
 }
@@ -36,7 +36,7 @@ export async function createDownloadUrl(payload: {
   expiresInSeconds?: number;
 }): Promise<{ url?: string; error?: string }> {
   if (!env.FILES_BUCKET_NAME) {
-    return { error: 'FILES_BUCKET_NAME is not set' };
+    return { error: "FILES_BUCKET_NAME is not set" };
   }
 
   const command = new GetObjectCommand({
@@ -51,7 +51,7 @@ export async function createDownloadUrl(payload: {
     return { url };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Failed to create download URL',
+      error: error instanceof Error ? error.message : "Failed to create download URL",
     };
   }
 }

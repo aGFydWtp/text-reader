@@ -1,32 +1,32 @@
 <script lang="ts">
-  import type { PageData } from './$types';
-  import DictEditor from './DictEditor.svelte';
+import type { PageData } from "./$types";
+import DictEditor from "./DictEditor.svelte";
 
-  let { data, form }: { data: PageData; form: any } = $props();
-  let entries = $state<{ key: string; value: string }[]>([]);
+const { data, form }: { data: PageData; form: any } = $props();
+let entries = $state<{ key: string; value: string }[]>([]);
 
-  const formDataStarted = $derived<boolean>(Boolean(form?.started) ?? false);
+const formDataStarted = $derived<boolean>(Boolean(form?.started) ?? false);
 
-  $effect(() => {
-    entries = data.dictEntries.map((entry) => ({ ...entry }));
-  });
+$effect(() => {
+  entries = data.dictEntries.map((entry) => ({ ...entry }));
+});
 
-  function statusTone({status, formDataStarted}:{status?: string, formDataStarted: boolean}) {
-    if (formDataStarted) {
-      return 'progress';
-    }
-
-    switch (status) {
-      case 'COMPLETED':
-        return 'done';
-      case 'FAILED':
-        return 'error';
-      case 'TTS_STARTED':
-        return 'progress';
-      default:
-        return 'neutral';
-    }
+function statusTone({ status, formDataStarted }: { status?: string; formDataStarted: boolean }) {
+  if (formDataStarted) {
+    return "progress";
   }
+
+  switch (status) {
+    case "COMPLETED":
+      return "done";
+    case "FAILED":
+      return "error";
+    case "TTS_STARTED":
+      return "progress";
+    default:
+      return "neutral";
+  }
+}
 </script>
 
 <section class="page">

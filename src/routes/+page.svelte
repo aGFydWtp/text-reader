@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { PageData } from './$types';
+import type { PageData } from "./$types";
 
-  let { data }: { data: PageData } = $props();
-  const jobs = $derived(data.jobs);
+let { data }: { data: PageData } = $props();
+const jobs = $derived(data.jobs);
 </script>
 
 <section class="page">

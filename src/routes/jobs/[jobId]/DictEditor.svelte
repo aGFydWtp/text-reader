@@ -1,22 +1,22 @@
 <script lang="ts">
-    import ArrowIcon from "$lib/components/icons/ArrowIcon.svelte";
-    import DeleteIcon from "$lib/components/icons/DeleteIcon.svelte";
+import ArrowIcon from "$lib/components/icons/ArrowIcon.svelte";
+import DeleteIcon from "$lib/components/icons/DeleteIcon.svelte";
 
-  type Entry = { key: string; value: string };
+type Entry = { key: string; value: string };
 
-  let { entries = $bindable<Entry[]>([]) } = $props();
+let { entries = $bindable<Entry[]>([]) } = $props();
 
-  function addRow() {
-    entries = [...entries, { key: '', value: '' }];
+function addRow() {
+  entries = [...entries, { key: "", value: "" }];
+}
+
+function removeRow(index: number) {
+  if (entries.length === 1) {
+    entries = [{ key: "", value: "" }];
+    return;
   }
-
-  function removeRow(index: number) {
-    if (entries.length === 1) {
-      entries = [{ key: '', value: '' }];
-      return;
-    }
-    entries = entries.filter((_, idx) => idx !== index);
-  }
+  entries = entries.filter((_, idx) => idx !== index);
+}
 </script>
 
 <div class="dict-header">

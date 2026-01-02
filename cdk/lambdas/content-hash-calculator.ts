@@ -1,7 +1,4 @@
-import type {
-  CloudFrontRequestEvent,
-  CloudFrontRequestHandler,
-} from "aws-lambda";
+import type { CloudFrontRequestEvent, CloudFrontRequestHandler } from "aws-lambda";
 
 /**
  * Calculate SHA256 hash of request payload for POST/PUT requests
@@ -14,9 +11,7 @@ const hashPayload = async (payload: string): Promise<string> => {
   return hashArray.map((bytes) => bytes.toString(16).padStart(2, "0")).join("");
 };
 
-export const handler: CloudFrontRequestHandler = async (
-  event: CloudFrontRequestEvent,
-) => {
+export const handler: CloudFrontRequestHandler = async (event: CloudFrontRequestEvent) => {
   const request = event.Records[0].cf.request;
 
   // Process POST/PUT/DELETE requests
@@ -32,19 +27,14 @@ export const handler: CloudFrontRequestHandler = async (
     const body = request.body.data;
     const encoding = request.body.encoding;
 
-    decodedBody =
-      encoding === "base64"
-        ? Buffer.from(body, "base64").toString("utf-8")
-        : body;
+    decodedBody = encoding === "base64" ? Buffer.from(body, "base64").toString("utf-8") : body;
   }
 
   // Calculate SHA256 hash of the request body
   const contentHash = await hashPayload(decodedBody);
 
   // Add the content hash header for OAC authentication
-  request.headers["x-amz-content-sha256"] = [
-    { key: "x-amz-content-sha256", value: contentHash },
-  ];
+  request.headers["x-amz-content-sha256"] = [{ key: "x-amz-content-sha256", value: contentHash }];
 
   return request;
 };
