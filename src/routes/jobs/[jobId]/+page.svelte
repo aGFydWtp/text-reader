@@ -59,7 +59,7 @@ function statusTone({ status, formDataStarted }: { status?: string; formDataStar
     {/if}
   </div>
 
-  <form class="card" method="post">
+  <form class="card" method="post" action="?/update">
     <DictEditor bind:entries />
     <button class="primary" type="submit">設定を保存</button>
     {#if form?.error}
