@@ -2,7 +2,7 @@
 
 テキストをアップロードして読み上げ音声を生成・再生できるアプリです。Cognito 認証、DynamoDB のジョブ管理、S3 直アップロード、Polly による音声生成を利用します。
 
-![image](./images//app-image.png)
+![image](images/image.png)
 
 ## 技術スタック
 
