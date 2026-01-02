@@ -15,6 +15,7 @@ const cognitoSubdomain = app.node.tryGetContext('cognitoSubdomain') ?? `auth.${c
 const certificateArn = app.node.tryGetContext('certificateArn');
 const cognitoDomainName = app.node.tryGetContext('cognitoDomainName');
 const cognitoCertificateArn = app.node.tryGetContext('cognitoCertificateArn');
+const lambdaEdgeArn = app.node.tryGetContext('lambdaEdgeArn');
 
 if (hostedZoneId && hostedZoneName) {
   new TextReaderCloudFrontAcmStack(app, 'TextReaderCloudFrontAcmStack', {
@@ -71,6 +72,7 @@ const appStack = new TextReaderStack(app, 'TextReaderStack', {
   customDomain,
   cognitoCustomDomain,
   googleOAuthSecret: secretsStack.googleOAuthSecret,
+  lambdaEdgeArn,
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */

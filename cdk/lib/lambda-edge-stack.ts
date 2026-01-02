@@ -2,7 +2,6 @@ import * as path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as ssm from "aws-cdk-lib/aws-ssm";
 import type { Construct } from "constructs";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
@@ -44,12 +43,6 @@ export class LambdaEdgeStack extends cdk.Stack {
       },
     );
 
-    // Create SSM parameters in us-east-1 for cross-region reference
-    new ssm.StringParameter(this, "LambdaEdgeVersionParam", {
-      parameterName: "/text-reader/lambda-edge/version-arn",
-      stringValue: this.lambdaEdgeFunction.currentVersion.functionArn,
-      description: "Lambda@Edge versioned function ARN for CloudFront",
-      tier: ssm.ParameterTier.STANDARD,
-    });
+    new cdk.CfnOutput(this, 'LambdaEdgeCurrentVersionArn', { value: this.lambdaEdgeFunction.currentVersion.functionArn });
   }
 }

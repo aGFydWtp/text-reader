@@ -115,7 +115,10 @@ pnpm -C cdk deploy:acm \
 GOOGLE_CLIENT_SECRET=your-secret pnpm -C cdk deploy:secrets
 ```
 
-5) App（ACM の ARN を指定）
+5) App（ACM, Lambda@Edge の ARN を指定）
+
+`deploy:lambda-edge` で取得した Lambda@Edge の Arn を使用する。
+
 ```sh
 GOOGLE_CLIENT_ID=your-client-id FRONTEND_IMAGE_TAG=2024-09-01 pnpm -C cdk deploy:app \
   -c hostedZoneId=Z002217135CBSLLD4NG0R \
@@ -123,7 +126,8 @@ GOOGLE_CLIENT_ID=your-client-id FRONTEND_IMAGE_TAG=2024-09-01 pnpm -C cdk deploy
   -c customSubdomain=text-reader \
   -c certificateArn=arn:aws:acm:us-east-1:... \
   -c cognitoDomainName=auth.text-reader.app.hr20k.com \
-  -c cognitoCertificateArn=arn:aws:acm:us-east-1:...
+  -c cognitoCertificateArn=arn:aws:acm:us-east-1:... \
+  -c lambdaEdgeArn=arn:aws:lambda:us-east-1:...
 ```
 
 ### Google OAuth 設定
