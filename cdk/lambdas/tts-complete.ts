@@ -8,14 +8,28 @@ const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 const { JOBS_TABLE_NAME, OUTPUT_PREFIX = 'files/audio/' } = process.env;
 
+/**
+ * 必須環境変数をチェックし、不足時は例外を投げる。
+ */
 const ensureRequiredEnv = () => {
   if (!JOBS_TABLE_NAME) {
     throw new Error('Missing required env var: JOBS_TABLE_NAME');
   }
 };
 
+/**
+ * 末尾のスラッシュ有無を正規化する。
+ * @param prefix S3 プレフィックス
+ * @returns スラッシュ付きプレフィックス
+ */
 const normalizePrefix = (prefix: string): string => (prefix.endsWith('/') ? prefix : `${prefix}/`);
 
+/**
+ * Polly OutputUri から S3 のオブジェクトキーを抽出する。
+ * s3:// 形式と https 形式の両方に対応する。
+ * @param outputUri Polly が返す OutputUri
+ * @returns 取得できたキー文字列、失敗時は null
+ */
 const extractKeyFromOutputUri = (outputUri?: string): string | null => {
   if (!outputUri) return null;
   try {
@@ -34,6 +48,11 @@ const extractKeyFromOutputUri = (outputUri?: string): string | null => {
   }
 };
 
+/**
+ * SNS メッセージ文字列から taskId を抽出する。
+ * @param message SNS メッセージ本文
+ * @returns taskId があれば文字列、なければ null
+ */
 const extractTaskId = (message: string): string | null => {
   try {
     const parsed = JSON.parse(message);
@@ -43,6 +62,10 @@ const extractTaskId = (message: string): string | null => {
   }
 };
 
+/**
+ * Polly 完了 SNS を受け取り、ジョブ状態を COMPLETED/FAILED に更新する Lambda ハンドラー。
+ * @param event SNS イベント
+ */
 export const handler = async (event: SNSEvent): Promise<void> => {
   ensureRequiredEnv();
   console.log('TTS complete event received', JSON.stringify(event, null, 2));

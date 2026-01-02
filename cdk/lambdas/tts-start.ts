@@ -19,6 +19,9 @@ const {
   POLLY_ENGINE = 'standard',
 } = process.env;
 
+/**
+ * 必須環境変数の不足をチェックし、欠けていれば例外を投げる。
+ */
 const ensureRequiredEnv = () => {
   const missing = [
     ['FILES_BUCKET_NAME', FILES_BUCKET_NAME],
@@ -33,6 +36,11 @@ const ensureRequiredEnv = () => {
   }
 };
 
+/**
+ * Readable ストリーム全体を文字列に変換する。
+ * @param stream 文字列または Buffer を含む Readable ストリーム
+ * @returns UTF-8 文字列
+ */
 const streamToString = async (stream: Readable): Promise<string> => {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
@@ -41,6 +49,11 @@ const streamToString = async (stream: Readable): Promise<string> => {
   return Buffer.concat(chunks).toString('utf-8');
 };
 
+/**
+ * SSML で安全に扱えるよう XML 予約文字をエスケープする。
+ * @param value 変換対象の文字列
+ * @returns エスケープ後の文字列
+ */
 const escapeXml = (value: string): string =>
   value
     .replaceAll('&', '&amp;')
@@ -49,6 +62,13 @@ const escapeXml = (value: string): string =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&apos;');
 
+/**
+ * 置換辞書を SSML の `<sub>` タグとして適用し、エスケープ済みテキストを返す。
+ * source が長いもの優先で置換する。
+ * @param text 元のテキスト
+ * @param dict 置換辞書（原文→読み上げ用の別名）
+ * @returns `<sub>` 適用済みの SSML ボディ文字列
+ */
 const applyDictionary = (text: string, dict: Record<string, string>): string => {
   const escapedText = escapeXml(text);
   const entries = Object.entries(dict)
@@ -63,6 +83,11 @@ const applyDictionary = (text: string, dict: Record<string, string>): string => 
   }, escapedText);
 };
 
+/**
+ * 末尾にスラッシュがない場合は付与して接頭辞として正規化する。
+ * @param prefix S3 キープレフィックス
+ * @returns スラッシュ付きプレフィックス
+ */
 const normalizePrefix = (prefix: string): string => (prefix.endsWith('/') ? prefix : `${prefix}/`);
 
 type JobRecord = {
@@ -73,6 +98,11 @@ type JobRecord = {
   fileDict?: Record<string, string>;
 };
 
+/**
+ * jobId を GSI で検索し、最初のレコードを返す。
+ * @param jobId ジョブID
+ * @returns 見つかった JobRecord か null
+ */
 const loadJobById = async (jobId: string): Promise<JobRecord | null> => {
   const jobResult = await dynamo.send(
     new QueryCommand({
@@ -97,6 +127,12 @@ const loadJobById = async (jobId: string): Promise<JobRecord | null> => {
   return jobResult.Items[0] as JobRecord;
 };
 
+/**
+ * S3 から対象オブジェクトを取得し、UTF-8 文字列として返す。
+ * @param bucketName バケット名
+ * @param objectKey オブジェクトキー
+ * @returns オブジェクト内容の文字列
+ */
 const loadTextFromS3 = async (bucketName: string, objectKey: string): Promise<string> => {
   const getObject = await s3.send(
     new GetObjectCommand({
@@ -112,6 +148,11 @@ const loadTextFromS3 = async (bucketName: string, objectKey: string): Promise<st
   return streamToString(getObject.Body as Readable);
 };
 
+/**
+ * ジョブを FAILED に更新し、エラーメッセージを記録する。
+ * @param job 対象ジョブ
+ * @param message 保存するエラーメッセージ
+ */
 const markFailed = async (job: JobRecord, message: string) => {
   await dynamo.send(
     new UpdateCommand({
@@ -129,6 +170,10 @@ const markFailed = async (job: JobRecord, message: string) => {
   );
 };
 
+/**
+ * テキスト読み上げジョブを実行し、Polly タスク開始と Dynamo 更新を行う。
+ * @param payload ジョブIDとオブジェクト情報
+ */
 const processJob = async (payload: { jobId: string; objectKey?: string; bucketName?: string }) => {
   const job = await loadJobById(payload.jobId);
   if (!job) {
@@ -214,6 +259,10 @@ const processJob = async (payload: { jobId: string; objectKey?: string; bucketNa
   );
 };
 
+/**
+ * S3 イベントまたは直接指定された jobId を受け取り、TTS を開始する Lambda ハンドラー。
+ * @param event S3Event もしくは jobId を含むオブジェクト
+ */
 export const handler = async (
   event: S3Event | { jobId?: string },
 ): Promise<void> => {
