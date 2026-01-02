@@ -25,10 +25,6 @@ const jobs = $derived(data.jobs);
             <div class="title">{job.filename ?? job.sk}</div>
             <span class={`pill ${job.status ?? 'neutral'}`}>{job.status ?? 'UNKNOWN'}</span>
           </div>
-          <div class="meta">
-            <span class="label">Updated</span>
-            <span>{job.updatedAt ?? '-'}</span>
-          </div>
         </a>
       {/each}
     </div>
@@ -99,13 +95,6 @@ const jobs = $derived(data.jobs);
     font-size: 16px;
     font-weight: 600;
     word-break: break-word;
-  }
-
-  .meta {
-    display: flex;
-    gap: 8px;
-    font-size: 12px;
-    color: #6b645c;
   }
 
   .label {
